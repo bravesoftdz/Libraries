@@ -30,7 +30,6 @@ type
 
   TParserModel=class
   private
-    FJobID: Integer;
     FParser: TParser;
     procedure ProcessLink(aLink: Integer);
   public
@@ -105,16 +104,17 @@ begin
 end;
 
 function TParser.GetLinkToProcess(out aLinkId, aLevel: integer): Boolean;
+var
+  dsQuery: TFDQuery;
 begin
-  Result:=False;
-
-  {if FisFirstRun then
-    begin
-      FisFirstRun:=False;
-      Result:=True;
-      aLinkId:=0;
-      aLevel:=1;
-    end;}
+  dsQuery:=TFDQuery.Create(nil);
+  try
+    dsQuery.SQL.Text:='select count(*) as LinksCount from links where job_id=:JobID';
+    dsQuery.ParamByName('JobID').AsInteger:=FJob.Id;
+    FMySQLEngine.OpenQuery(dsQuery);
+  finally
+    dsQuery.Free;
+  end;
 end;
 
 constructor TParser.Create(aJobID: Integer; aMySQLEngine: TMySQLEngine);
