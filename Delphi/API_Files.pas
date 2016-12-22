@@ -10,6 +10,7 @@ type
   TFilesEngine = class
     public
       class function GetTextFromFile(FileName: String): String;
+      class procedure SaveTextToFile(FileName, Text: String);
   end;
 
 implementation
@@ -27,6 +28,19 @@ begin
     finally
       SL.Free;
     end;
+  end;
+end;
+
+class procedure TFilesEngine.SaveTextToFile(FileName, Text: String);
+var
+  SL: TStringList;
+begin
+  SL := TStringList.Create;
+  try
+    SL.Text := Text;
+    SL.SaveToFile(FileName);
+  finally
+    SL.Free;
   end;
 end;
 
