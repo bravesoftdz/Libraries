@@ -13,26 +13,28 @@ type
   TProcessDOM = procedure(aDocument: IHTMLDocument2) of object;
 
   TJobRule=record
-    Mode: string;
+    Mode: set of (Single, Multi);
+    ObjType: set of (Link, Text);
     Level: Integer;
     XPath: string;
   end;
 
   TJobParam=record
-    level: Integer;
-    rules: TArray<TJobRule>;
+    Level: Integer;
+    Rules: TArray<TJobRule>;
   end;
 
   TJob=class
   private
     FZeroLink: string;
     FId: Integer;
-    FParams: TArray<TJobParam>;
+    FJobParams: TArray<TJobParam>;
   public
+    function GetJobParamByLevel(aLevel: integer): TJobParam;
     constructor Create(aJobID: integer; aMySQLEngine: TMySQLEngine);
     property Id: integer read FId;
     property ZeroLink: string read FZeroLink;
-    property Params: TArray<TJobParam> read FParams;
+    property JobParams: TArray<TJobParam> read FJobParams;
   end;
 
   TCurrLink=record
@@ -61,13 +63,17 @@ type
   TParserModel=class
   private
     FParser: TParser;
+    FJob: TJob;
+    FCurrLink: TCurrLink;
     procedure ProcessDOM(aDocument: IHTMLDocument2);
   public
     procedure StartJob(aJobID: integer);
   end;
 
   TParseTools = class
-    class function ParseByKey(aPage:string; aFirstKey:string; aLastKey:string; aFirstKeyCount:integer = 0): string;
+    class function ParseLinks(aDocument: IHTMLDocument2; aXPath: string): TArray<string>;
+    class function ParseByRegEx(aPage:string; aRegEx:string): TArray<string>;
+    class function ParseStrByRegEx(aPage:string; aRegEx:string): string;
     class function Explode(aIncome: string; aDelimiter: string): TArray<string>;
   end;
 
@@ -75,30 +81,64 @@ implementation
 
 uses
    FireDAC.Comp.Client
+  ,RegularExpressions
   ,Variants, unit1, Vcl.Controls, System.SysUtils;
 
-class function TParseTools.ParseByKey(aPage:string; aFirstKey:string; aLastKey:string; aFirstKeyCount:integer = 0): string;
+class function TParseTools.ParseByRegEx(aPage:string; aRegEx:string): TArray<string>;
 var
-  tx:string;
-  i:integer;
+  m: TMatch;
 begin
-  if aFirstKey.Length=0 then
+  m := TRegEx.Match(aPage, aRegEx);
+  while m.Success do
     begin
-      aFirstKey:='!#!';
-      aPage:='!#!'+aPage;
+      Result := Result + [m.value];
+      m := m.NextMatch;
     end;
+end;
 
-  for i:=1 to aFirstKeyCount-1 do
+class function TParseTools.ParseStrByRegEx(aPage:string; aRegEx:string): string;
+var
+  m: TArray<string>;
+begin
+  m:=ParseByRegEx(aPage, aRegEx);
+  if Length(m)>0 then Result:=m[0];
+end;
+
+class function TParseTools.ParseLinks(aDocument: IHTMLDocument2; aXPath: string): TArray<string>;
+var
+  XPath: TArray<string>;
+  Collection: IHTMLElementCollection;
+  i: Integer;
+  Tag: string;
+  TagIndx: Integer;
+begin
+  XPath:=TParseTools.Explode(aXPath, '/');
+
+  Collection:=aDocument.all as IHTMLElementCollection;
+  for i := 1 to Length(XPath)-1 do
     begin
-      Delete(aPage, 1, Pos(aFirstKey, aPage) + Length(aFirstKey));
+      Tag:=XPath[i];
+
+      TagIndx:=StrToIntDef(TParseTools.ParseStrByRegEx(Tag, '[\d+]'), 1)-1;
+      Tag:=TParseTools.ParseStrByRegEx(Tag, '[a-zA-Z]+');
+
+      //Collection:=Collection.tags(Tag) as IHTMLElementCollection;
+      //iElement:=Collection.Item(TagIndx, TagIndx) as IHTMLElement;
+      //Collection:=iElement.children as IHTMLElementCollection;
     end;
-  if Pos(aFirstKey, aPage)>0 then
-    begin
-      tx:=Copy(aPage, Pos(aFirstKey, aPage) + Length(aFirstKey), Length(aPage));
-      Delete(tx, Pos(aLastKey, tx), Length(tx));
-      tx:=Trim(tx);
-    end;
-  Result:=tx;
+  //ShowMessage(iElement.outerText);
+end;
+
+function TJob.GetJobParamByLevel(aLevel: integer): TJobParam;
+var
+  i: Integer;
+begin
+  for i:=0 to Length(FJobParams)-1 do
+    if FJobParams[i].Level=aLevel  then
+      begin
+        Result:=FJobParams[i];
+        Break;
+      end;
 end;
 
 class function TParseTools.Explode(aIncome: string; aDelimiter: string): TArray<string>;
@@ -109,13 +149,13 @@ begin
   tx:='';
   for i := 1 to Length(aIncome) do
     begin
-    if (aIncome[i]<>aDelimiter) then tx:=tx+aIncome[i];
-    if (aIncome[i]=aDelimiter) or (i=Length(aIncome)) then
-      begin
-        SetLength(Result, Length(Result)+1);
-        Result[Length(Result)-1]:=Trim(tx);
-        tx:='';
-      end;
+      if (aIncome[i]<>aDelimiter) then tx:=tx+aIncome[i];
+      if (aIncome[i]=aDelimiter) or (i=Length(aIncome)) then
+        begin
+          SetLength(Result, Length(Result)+1);
+          Result[Length(Result)-1]:=Trim(tx);
+          tx:='';
+        end;
     end;
 end;
 
@@ -126,35 +166,20 @@ end;
 
 procedure TParserModel.ProcessDOM(aDocument: IHTMLDocument2);
 var
-  sXPath: string;
+  CurrentParam: TJobParam;
   i: integer;
-  Collection: IHTMLElementCollection;
-  iElement: IHTMLElement;
-  XPath: TArray<string>;
-  Tag: string;
-  TagIndx: Integer;
+  Rule: TJobRule;
+  Links: TArray<string>;
 begin
+  CurrentParam:=FJob.GetJobParamByLevel(FCurrLink.Level);
 
-
-
-
-
-
-  sXPath:='/html/body/div[3]/div[3]/div[4]/div[2]/div[2]/div/div/div/ul/li/a';
-
-  XPath:=TParseTools.Explode(sXPath, '/');
-  Collection:=aDocument.all as IHTMLElementCollection;
-  for i := 1 to Length(XPath)-1 do
+  for i:=0 to Length(CurrentParam.Rules)-1 do
     begin
-      Tag:=XPath[i];
-      TagIndx:=StrToIntDef(TParseTools.ParseByKey(Tag, '[', ']'), 1)-1;
-      Delete(Tag, Pos('[', Tag), Length(Tag));
+      Rule:=CurrentParam.Rules[i];
 
-      Collection:=Collection.tags(Tag) as IHTMLElementCollection;
-      iElement:=Collection.Item(TagIndx, TagIndx) as IHTMLElement;
-      Collection:=iElement.children as IHTMLElementCollection;
+      // Parse New Links
+      if Rule.ObjType = [Link] then Links:=TParseTools.ParseLinks(aDocument, Rule.XPath);
     end;
-  ShowMessage(iElement.outerText);
 end;
 
 procedure TParser.GetDocumentByLink(aCurrLink: TCurrLink; aCallBack: TProcessDOM);
@@ -198,18 +223,60 @@ end;
 
 constructor TJob.Create(aJobID: Integer; aMySQLEngine: TMySQLEngine);
 var
-  dsQuery: TFDQuery;
+  dsJob, dsJobParams, dsJobRule: TFDQuery;
+  JobParam: TJobParam;
+  JobRule: TJobRule;
 begin
-  dsQuery:=TFDQuery.Create(nil);
+  dsJob:=TFDQuery.Create(nil);
+  dsJobParams:=TFDQuery.Create(nil);
+  dsJobRule:=TFDQuery.Create(nil);
   try
-    dsQuery.SQL.Text:='select * from jobs where id=:JobID';
-    dsQuery.ParamByName('JobID').AsInteger:=aJobID;
-    aMySQLEngine.OpenQuery(dsQuery);
+    dsJob.SQL.Text:='select * from jobs where id=:JobID';
+    dsJob.ParamByName('JobID').AsInteger:=aJobID;
+    aMySQLEngine.OpenQuery(dsJob);
 
-    FId:=dsQuery.FieldByName('Id').AsInteger;
-    FZeroLink:=dsQuery.FieldByName('zero_link').AsString;
+    FId:=dsJob.FieldByName('Id').AsInteger;
+    FZeroLink:=dsJob.FieldByName('zero_link').AsString;
+
+    //JobParams
+    dsJobParams.SQL.Text:='select * from job_params where job_id=:JobID order by level';
+    dsJobParams.ParamByName('JobID').AsInteger:=aJobID;
+    aMySQLEngine.OpenQuery(dsJobParams);
+
+    while not dsJobParams.Eof do
+      begin
+        JobParam.level:=dsJobParams.FieldByName('level').AsInteger;
+
+        //JobRule
+        dsJobRule.SQL.Text:='select * from job_param_rules where job_param_id=:ParamID order by level';
+        dsJobRule.ParamByName('ParamID').AsInteger:=dsJobParams.FieldByName('Id').AsInteger;
+        aMySQLEngine.OpenQuery(dsJobRule);
+
+        while not dsJobRule.EOF do
+          begin
+            case dsJobRule.FieldByName('obj_type').AsInteger of
+              1: JobRule.ObjType:=[Link];
+              2: JobRule.ObjType:=[Text];
+            end;
+
+            case dsJobRule.FieldByName('mode').AsInteger of
+              1: JobRule.Mode:=[Single];
+              2: JobRule.Mode:=[Multi];
+            end;
+            JobRule.Level:=dsJobRule.FieldByName('level').AsInteger;
+            JobRule.XPath:=dsJobRule.FieldByName('xpath').AsString;
+
+            JobParam.Rules:=JobParam.Rules+[JobRule];
+            dsJobRule.Next;
+          end;
+
+        FJobParams:=FJobParams + [JobParam];
+        dsJobParams.Next;
+      end;
   finally
-    dsQuery.Free
+    dsJob.Free;
+    dsJobParams.Free;
+    dsJobRule.Free;
   end;
 end;
 
@@ -264,16 +331,14 @@ end;
 procedure TParserModel.StartJob(aJobID: integer);
 var
   MySQLEngine: TMySQLEngine;
-  Job: TJob;
-  CurrLink: TCurrLink;
 begin
   MySQLEngine:=TMySQLEngine.Create;
   MySQLEngine.OpenConnection('MySQL.ini');
-  Job:=TJob.Create(aJobID, MySQLEngine);
-  FParser:=TParser.Create(Job, MySQLEngine);
+  FJob:=TJob.Create(aJobID, MySQLEngine);
+  FParser:=TParser.Create(FJob, MySQLEngine);
 
-  CurrLink:=FParser.GetCurrLink;
-  FParser.GetDocumentByLink(CurrLink, ProcessDOM);
+  FCurrLink:=FParser.GetCurrLink;
+  FParser.GetDocumentByLink(FCurrLink, ProcessDOM);
   {try
 
     isProcessing := True;
