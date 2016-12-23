@@ -13,10 +13,11 @@ type
   TProcessDOM = procedure(aDocument: IHTMLDocument2) of object;
 
   TJobRule=record
-    Mode: set of (Single, Multi);
     ObjType: set of (Link, Text);
     Level: Integer;
     XPath: string;
+    ContainerOffset: Integer;
+    RegExp: string;
   end;
 
   TJobParam=record
@@ -71,7 +72,7 @@ type
   end;
 
   TParseTools = class
-    class function ParseLinks(aDocument: IHTMLDocument2; aXPath: string): TArray<string>;
+    class function ParseDOMByRule(aDocument: IHTMLDocument2; aRule: TJobRule): TArray<string>;
     class function ParseByRegEx(aPage:string; aRegEx:string): TArray<string>;
     class function ParseStrByRegEx(aPage:string; aRegEx:string): string;
     class function Explode(aIncome: string; aDelimiter: string): TArray<string>;
@@ -100,33 +101,112 @@ class function TParseTools.ParseStrByRegEx(aPage:string; aRegEx:string): string;
 var
   m: TArray<string>;
 begin
+  Result:='';
   m:=ParseByRegEx(aPage, aRegEx);
   if Length(m)>0 then Result:=m[0];
 end;
 
-class function TParseTools.ParseLinks(aDocument: IHTMLDocument2; aXPath: string): TArray<string>;
+class function TParseTools.ParseDOMByRule(aDocument: IHTMLDocument2; aRule: TJobRule): TArray<string>;
+
+  procedure GetTagAndIndx(var aTag: string; out aIndex: integer);
+    begin
+      aIndex:=StrToIntDef(ParseStrByRegEx(aTag, '[\d+]'), 1);
+      aTag:=ParseStrByRegEx(aTag, '[a-zA-Z]+');
+    end;
+
+  function GetChildCollection(aCollection: IHTMLElementCollection; aTag: string; aIndex: Integer): IHTMLElementCollection;
+  var
+    iElement: IHTMLElement;
+    begin
+      Result:=aCollection.tags(aTag) as IHTMLElementCollection;
+      iElement:=Result.Item(aIndex-1, aIndex-1) as IHTMLElement;
+      Result:=iElement.Children as IHTMLElementCollection;
+    end;
+
+    function GetElIndex(aHandledTree: TArray<TArray<integer>>; i: Integer): Integer;
+      begin
+        if Length(aHandledTree[i])=0 then Result:=0
+        else Result:=aHandledTree[i][High(aHandledTree[i])];
+      end;
+
 var
   XPath: TArray<string>;
-  Collection: IHTMLElementCollection;
-  i: Integer;
+  ContCollection, Collection: IHTMLElementCollection;
+  iElement: IHTMLElement;
+  i, j, ElIndex: Integer;
   Tag: string;
-  TagIndx: Integer;
+  TagIndx, ContainerIndx: Integer;
+  HandledTree: TArray<TArray<integer>>;
+  TagList: TArray<string>;
+  isProcessing: Boolean;
 begin
-  XPath:=TParseTools.Explode(aXPath, '/');
+  XPath:=TParseTools.Explode(aRule.XPath, '/');
+  ContCollection:=aDocument.all as IHTMLElementCollection;
+  ContainerIndx:=Length(XPath) - aRule.ContainerOffset;
 
-  Collection:=aDocument.all as IHTMLElementCollection;
-  for i := 1 to Length(XPath)-1 do
+  // получить HTML контейнер в виде коллекции
+  for i := 1 to ContainerIndx - 1 do
     begin
       Tag:=XPath[i];
-
-      TagIndx:=StrToIntDef(TParseTools.ParseStrByRegEx(Tag, '[\d+]'), 1)-1;
-      Tag:=TParseTools.ParseStrByRegEx(Tag, '[a-zA-Z]+');
-
-      //Collection:=Collection.tags(Tag) as IHTMLElementCollection;
-      //iElement:=Collection.Item(TagIndx, TagIndx) as IHTMLElement;
-      //Collection:=iElement.children as IHTMLElementCollection;
+      GetTagAndIndx(Tag, TagIndx);
+      ContCollection:=GetChildCollection(ContCollection, Tag, TagIndx);
     end;
-  //ShowMessage(iElement.outerText);
+
+  // строим список тегов
+  for i := ContainerIndx to Length(XPath)-1 do
+    begin
+      Tag:=XPath[i];
+      GetTagAndIndx(Tag, TagIndx);
+      TagList:=TagList+[Tag];
+    end;
+
+  // обход дерева внутри контейнера
+  isProcessing:=True;
+  SetLength(HandledTree, aRule.ContainerOffset);
+  while isProcessing do
+    begin
+      Collection:=ContCollection;
+      for i := 0 to Length(HandledTree)-1 do
+        begin
+          // получаем индекс в дереве в зависимости от глубины
+          ElIndex:=GetElIndex(HandledTree, i);
+
+          // получаем DOM элемент
+          Collection:=Collection.tags(TagList[i]) as IHTMLElementCollection;
+          iElement:=Collection.Item(ElIndex, ElIndex) as IHTMLElement;
+
+          if iElement<>nil then // DOM элемент существует
+            begin
+              // если дошли до дна, то получаем результат
+              if i=Length(HandledTree)-1 then
+                begin
+                  Inc(ElIndex);
+                  HandledTree[i]:=HandledTree[i] + [ElIndex];
+
+                  if aRule.ObjType=[Link] then
+                    Result:=Result+[iElement.getAttribute('href', 0)];
+                end;
+
+              Collection:=iElement.children as IHTMLElementCollection;
+            end
+          else // DOM элемент не существует
+            begin
+              if i=0 then isProcessing:=False
+              else
+                begin
+                  //увеличиваем индекс на уровне выше
+                  ElIndex:=GetElIndex(HandledTree, i-1);
+                  Inc(ElIndex);
+                  HandledTree[i-1]:=HandledTree[i-1] + [ElIndex];
+
+                  //чистим индексы на нижних уровнях
+                  for j := i to Length(HandledTree)-1 do SetLength(HandledTree[j], 0);
+                end;
+
+              Break;
+            end;
+        end;
+    end;
 end;
 
 function TJob.GetJobParamByLevel(aLevel: integer): TJobParam;
@@ -167,9 +247,9 @@ end;
 procedure TParserModel.ProcessDOM(aDocument: IHTMLDocument2);
 var
   CurrentParam: TJobParam;
-  i: integer;
+  i, j: integer;
   Rule: TJobRule;
-  Links: TArray<string>;
+  Records: TArray<string>;
 begin
   CurrentParam:=FJob.GetJobParamByLevel(FCurrLink.Level);
 
@@ -177,8 +257,12 @@ begin
     begin
       Rule:=CurrentParam.Rules[i];
 
-      // Parse New Links
-      if Rule.ObjType = [Link] then Links:=TParseTools.ParseLinks(aDocument, Rule.XPath);
+      Records:=TParseTools.ParseDOMByRule(aDocument, Rule);
+      for j := 0 to Length(Records)-1 do
+        begin
+          if Rule.ObjType=[Link] then
+            FParser.AddLink(Records[j], Rule.Level);
+        end;
     end;
 end;
 
@@ -258,14 +342,10 @@ begin
               1: JobRule.ObjType:=[Link];
               2: JobRule.ObjType:=[Text];
             end;
-
-            case dsJobRule.FieldByName('mode').AsInteger of
-              1: JobRule.Mode:=[Single];
-              2: JobRule.Mode:=[Multi];
-            end;
             JobRule.Level:=dsJobRule.FieldByName('level').AsInteger;
             JobRule.XPath:=dsJobRule.FieldByName('xpath').AsString;
-
+            JobRule.ContainerOffset:=dsJobRule.FieldByName('container_offset').AsInteger;
+            JobRule.RegExp:=dsJobRule.FieldByName('regexp').AsString;
             JobParam.Rules:=JobParam.Rules+[JobRule];
             dsJobRule.Next;
           end;
