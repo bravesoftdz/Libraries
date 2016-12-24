@@ -17,6 +17,7 @@ type
     Level: Integer;
     XPath: string;
     ContainerOffset: Integer;
+    Key: string;
     RegExp: string;
   end;
 
@@ -51,12 +52,14 @@ type
     FWebBrowser: TWebBrowser;
     FProcessDOM: TProcessDOM;
     function CheckFirstRun: Boolean;
-    function AddLink(aLink: string; aLevel: Integer): Integer;
     procedure WebBrowserInit;
     procedure WebBrowserDocumentComplete(ASender: TObject; const pDisp: IDispatch; const URL: OleVariant);
   public
     constructor Create(aJob: TJob; aMySQLEngine: TMySQLEngine);
     function GetCurrLink: TCurrLink;
+    function AddLink(aLink: string; aLevel: Integer): Integer;
+    procedure AddData(aLinkId, aRecordNum: Integer; aKey, aValue: string);
+    procedure SetLinkHandle(aLinkID: Integer; aValue: integer);
     procedure GetDocumentByLink(aCurrLink: TCurrLink; aCallBack: TProcessDOM);
     property ProcessDOM: TProcessDOM read FProcessDOM write FProcessDOM;
   end;
@@ -66,6 +69,7 @@ type
     FParser: TParser;
     FJob: TJob;
     FCurrLink: TCurrLink;
+    procedure GetNextLink;
     procedure ProcessDOM(aDocument: IHTMLDocument2);
   public
     procedure StartJob(aJobID: integer);
@@ -84,6 +88,53 @@ uses
    FireDAC.Comp.Client
   ,RegularExpressions
   ,Variants, unit1, Vcl.Controls, System.SysUtils;
+
+procedure TParser.AddData(aLinkId: Integer; aRecordNum: Integer; aKey: string; aValue: string);
+var
+  sql: string;
+  dsQuery: TFDQuery;
+begin
+  dsQuery:=TFDQuery.Create(nil);
+  try
+    sql:='insert into records set';
+    sql:=sql+' `link_id`=:link_id';
+    sql:=sql+',`num`=:num';
+    sql:=sql+',`key`=:key';
+    sql:=sql+',`value`=:value';
+    sql:=sql+',`value_hash`=md5(:value)';
+    dsQuery.SQL.Text:=sql;
+    dsQuery.ParamByName('link_id').AsInteger:=aLinkId;
+    dsQuery.ParamByName('num').AsInteger:=aRecordNum;
+    dsQuery.ParamByName('key').AsString:=aKey;
+    dsQuery.ParamByName('value').AsWideString:=aValue;
+
+    FMySQLEngine.ExecQuery(dsQuery);
+  finally
+    dsQuery.Free;
+  end;
+end;
+
+procedure TParserModel.GetNextLink;
+begin
+  FParser.SetLinkHandle(FCurrLink.Id, 2);
+  FCurrLink:=FParser.GetCurrLink;
+  FParser.GetDocumentByLink(FCurrLink, ProcessDOM);
+end;
+
+procedure TParser.SetLinkHandle(aLinkID: Integer; aValue: Integer);
+var
+  dsQuery: TFDQuery;
+begin
+  dsQuery:=TFDQuery.Create(nil);
+  try
+    dsQuery.SQL.Text:='update links set handled=:Value where id=:LinkID';
+    dsQuery.ParamByName('Value').AsInteger:=aValue;
+    dsQuery.ParamByName('LinkID').AsInteger:=aLinkID;
+    FMySQLEngine.ExecQuery(dsQuery);
+  finally
+    dsQuery.Free;
+  end;
+end;
 
 class function TParseTools.ParseByRegEx(aPage:string; aRegEx:string): TArray<string>;
 var
@@ -123,11 +174,19 @@ class function TParseTools.ParseDOMByRule(aDocument: IHTMLDocument2; aRule: TJob
       Result:=iElement.Children as IHTMLElementCollection;
     end;
 
-    function GetElIndex(aHandledTree: TArray<TArray<integer>>; i: Integer): Integer;
-      begin
-        if Length(aHandledTree[i])=0 then Result:=0
-        else Result:=aHandledTree[i][High(aHandledTree[i])];
-      end;
+  function GetElIndex(aHandledTree: TArray<TArray<integer>>; i: Integer): Integer;
+    begin
+      if Length(aHandledTree[i])=0 then Result:=0
+      else Result:=aHandledTree[i][High(aHandledTree[i])];
+    end;
+
+  procedure FillResult(var aResult:TArray<string>; aRule: TJobRule; aElement: IHTMLElement);
+    begin
+      if aRule.ObjType=[Link] then
+        aResult:=aResult+[aElement.getAttribute('href', 0)];
+      if aRule.ObjType=[Text] then
+        aResult:=aResult+[aElement.outerText];
+    end;
 
 var
   XPath: TArray<string>;
@@ -140,9 +199,11 @@ var
   TagList: TArray<string>;
   isProcessing: Boolean;
 begin
+  SetLength(Result, 0);
   XPath:=TParseTools.Explode(aRule.XPath, '/');
   ContCollection:=aDocument.all as IHTMLElementCollection;
   ContainerIndx:=Length(XPath) - aRule.ContainerOffset;
+  if aRule.ContainerOffset=0 then Dec(ContainerIndx);
 
   // получить HTML контейнер в виде коллекции
   for i := 1 to ContainerIndx - 1 do
@@ -163,6 +224,7 @@ begin
   // обход дерева внутри контейнера
   isProcessing:=True;
   SetLength(HandledTree, aRule.ContainerOffset);
+  if aRule.ContainerOffset=0 then SetLength(HandledTree, 1);
   while isProcessing do
     begin
       Collection:=ContCollection;
@@ -183,8 +245,8 @@ begin
                   Inc(ElIndex);
                   HandledTree[i]:=HandledTree[i] + [ElIndex];
 
-                  if aRule.ObjType=[Link] then
-                    Result:=Result+[iElement.getAttribute('href', 0)];
+                  FillResult(Result, aRule, iElement);
+                  if aRule.ContainerOffset=0 then isProcessing:=False
                 end;
 
               Collection:=iElement.children as IHTMLElementCollection;
@@ -262,8 +324,12 @@ begin
         begin
           if Rule.ObjType=[Link] then
             FParser.AddLink(Records[j], Rule.Level);
+          if Rule.ObjType=[Text] then
+            FParser.AddData(FCurrLink.Id, j, Rule.Key, Records[j]);
         end;
     end;
+
+  GetNextLink;
 end;
 
 procedure TParser.GetDocumentByLink(aCurrLink: TCurrLink; aCallBack: TProcessDOM);
@@ -323,15 +389,17 @@ begin
     FZeroLink:=dsJob.FieldByName('zero_link').AsString;
 
     //JobParams
+    dsJobParams.Close;
     dsJobParams.SQL.Text:='select * from job_params where job_id=:JobID order by level';
     dsJobParams.ParamByName('JobID').AsInteger:=aJobID;
     aMySQLEngine.OpenQuery(dsJobParams);
 
-    while not dsJobParams.Eof do
+    while not dsJobParams.EOF do
       begin
         JobParam.level:=dsJobParams.FieldByName('level').AsInteger;
 
         //JobRule
+        setLength(JobParam.Rules, 0);
         dsJobRule.SQL.Text:='select * from job_param_rules where job_param_id=:ParamID order by level';
         dsJobRule.ParamByName('ParamID').AsInteger:=dsJobParams.FieldByName('Id').AsInteger;
         aMySQLEngine.OpenQuery(dsJobRule);
@@ -345,6 +413,7 @@ begin
             JobRule.Level:=dsJobRule.FieldByName('level').AsInteger;
             JobRule.XPath:=dsJobRule.FieldByName('xpath').AsString;
             JobRule.ContainerOffset:=dsJobRule.FieldByName('container_offset').AsInteger;
+            JobRule.Key:=dsJobRule.FieldByName('key').AsString;
             JobRule.RegExp:=dsJobRule.FieldByName('regexp').AsString;
             JobParam.Rules:=JobParam.Rules+[JobRule];
             dsJobRule.Next;
@@ -388,6 +457,8 @@ begin
     sql:=sql+' from links';
     sql:=sql+' where job_id=:JobID';
     sql:=sql+' and handled is null';
+    sql:=sql+' order by level desc, id';
+    sql:=sql+' limit 1';
     dsQuery.SQL.Text:=sql;
     dsQuery.ParamByName('JobID').AsInteger:=FJob.Id;
     FMySQLEngine.OpenQuery(dsQuery);
@@ -395,6 +466,8 @@ begin
     Result.Id:=dsQuery.FieldByName('Id').AsInteger;
     Result.Link:=dsQuery.FieldByName('link').AsString;
     Result.Level:=dsQuery.FieldByName('level').AsInteger;
+
+    SetLinkHandle(Result.Id, 1);
   finally
     dsQuery.Free;
   end;
@@ -416,23 +489,6 @@ begin
   MySQLEngine.OpenConnection('MySQL.ini');
   FJob:=TJob.Create(aJobID, MySQLEngine);
   FParser:=TParser.Create(FJob, MySQLEngine);
-
-  FCurrLink:=FParser.GetCurrLink;
-  FParser.GetDocumentByLink(FCurrLink, ProcessDOM);
-  {try
-
-    isProcessing := True;
-    while isProcessing do
-      begin
-        isProcessing := FParser.GetLinkToProcess(CurrLink);
-
-        Document:=FParser.GetDocumentByLink(CurrLink);
-      end;
-
-  finally
-    FParser.Free;
-    MySQLEngine.Free;
-    Job.Free;
-  end; }
+  GetNextLink;
 end;
 end.
