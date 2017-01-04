@@ -24,6 +24,7 @@ type
     procedure OpenQuery(aQuery: TFDQuery); overload;
     procedure OpenQuery(aQuery: TFDQuery; aSQL: string); overload;
     procedure ExecQuery(aQuery: TFDQuery);
+    property Connection: TFDConnection read FDConnection;
   end;
 
   TMySQLEngine = class(TDBEngine)

@@ -71,8 +71,6 @@ type
     FCurrLink: TCurrLink;
     procedure GetNextLink;
     procedure ProcessDOM(aDocument: IHTMLDocument2);
-  public
-    procedure StartJob(aJobID: integer);
   end;
 
   TParseTools = class
@@ -481,14 +479,4 @@ begin
   WebBrowserInit;
 end;
 
-procedure TParserModel.StartJob(aJobID: integer);
-var
-  MySQLEngine: TMySQLEngine;
-begin
-  MySQLEngine:=TMySQLEngine.Create;
-  MySQLEngine.OpenConnection('MySQL.ini');
-  FJob:=TJob.Create(aJobID, MySQLEngine);
-  FParser:=TParser.Create(FJob, MySQLEngine);
-  GetNextLink;
-end;
 end.
