@@ -67,7 +67,6 @@ type
   TParserModel=class
   private
     FParser: TParser;
-    FJob: TJob;
     FCurrLink: TCurrLink;
     procedure GetNextLink;
     procedure ProcessDOM(aDocument: IHTMLDocument2);
