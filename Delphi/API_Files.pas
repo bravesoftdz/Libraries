@@ -11,9 +11,23 @@ type
     public
       class function GetTextFromFile(FileName: String): String;
       class procedure SaveTextToFile(FileName, Text: String);
+      class procedure AppendToFile(FileName, Text: String);
   end;
 
 implementation
+
+class procedure TFilesEngine.AppendToFile(FileName, Text: String);
+var
+  EditFile: TextFile;
+begin
+  try
+    AssignFile(EditFile, FileName);
+    Append(EditFile);
+    WriteLn(EditFile, Text);
+    CloseFile(EditFile);
+  except
+  end;
+end;
 
 class function TFilesEngine.GetTextFromFile(FileName: string): string;
 var

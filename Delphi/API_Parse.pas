@@ -7,6 +7,7 @@ type
     class function ParseByRegEx(aPage:string; aRegEx:string): TArray<string>;
     class function ParseStrByRegEx(aPage:string; aRegEx:string): string;
     class function Explode(aIncome: string; aDelimiter: string): TArray<string>;
+    class function GetNormalizeString(aLine: string): string;
   end;
 
 implementation
@@ -14,6 +15,17 @@ implementation
 uses
    System.SysUtils
   ,RegularExpressions;
+
+class function TParseTools.GetNormalizeString(aLine: string): string;
+begin
+  while Pos(#$D, aLine)>0 do
+    aLine:=StringReplace(aLine, #$D, ' ', [rfReplaceAll, rfIgnoreCase]);
+  while Pos(#$A, aLine)>0 do
+    aLine:=StringReplace(aLine, #$A, ' ', [rfReplaceAll, rfIgnoreCase]);
+  while Pos('  ', aLine)>0 do
+    aLine:=StringReplace(aLine, '  ', ' ', [rfReplaceAll, rfIgnoreCase]);
+  Result:=Trim(aLine);
+end;
 
 class function TParseTools.ParseByRegEx(aPage:string; aRegEx:string): TArray<string>;
 var
