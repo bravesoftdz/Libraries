@@ -42,6 +42,7 @@ type
     FController: TControllerAbstract;
     FControllerClass: TControllerClass;
     procedure InitMVC; virtual; abstract;
+    procedure InitView; virtual; abstract;
     procedure SendMessage(aMsg: string);
     procedure FreeAfterClose(Sender: TObject; var Action: TCloseAction);
   public
@@ -55,7 +56,7 @@ type
     FData: TDictionary<string, variant>;
     FObjData: TObjectDictionary<string, TObject>;
     FMainView: TViewAbstract;
-    procedure PerfomViewMessage(aMsg: string; aViewSender: TViewAbstract); virtual; abstract;
+    procedure PerfomViewMessage(aMsg: string); virtual; abstract;
     procedure EventListener(aEventMsg: string); virtual; abstract;
     procedure CallView(aViewAbstractClass: TViewAbstractClass; aIsModal: Boolean = false);
     procedure CallModel(aModelClass: TModelClass); virtual;
@@ -122,7 +123,7 @@ procedure TControllerAbstract.ReceiveViewMessage(aMsg: string; aViewSender: TVie
 begin
   FData.Clear;
   FObjData.Clear;
-  PerfomViewMessage(aMsg, aViewSender);
+  PerfomViewMessage(aMsg);
 end;
 
 procedure TViewAbstract.SendMessage(aMsg: string);
@@ -140,6 +141,7 @@ end;
 constructor TViewAbstract.Create(AOwner: TComponent);
 begin
   inherited;
+  InitView;
 
   if AOwner is TViewAbstract then
     begin
