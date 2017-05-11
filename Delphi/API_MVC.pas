@@ -17,7 +17,7 @@ type
   TControllerAbstract = class;
   TControllerClass = class of TControllerAbstract;
 
-  TEventPerfom = procedure of object;
+  TModelProc = procedure of object;
   TEventListener = procedure(aEventMsg: string) of object;
 
   // Model
@@ -26,12 +26,14 @@ type
     FData: TDictionary<string, variant>;
     FObjData: TObjectDictionary<string, TObject>;
     FOnEvent: TEventListener;
-    procedure CreateEvent(aEventMsg: string; aEventProc: TEventPerfom = nil);
+    FProc: TModelProc;
+    procedure CreateEvent(aEventMsg: string);
   public
     procedure Execute; virtual; abstract;
     constructor Create(aData: TDictionary<string, variant>;
       aObjData: TObjectDictionary<string, TObject>); virtual;
     property OnEvent: TEventListener read FOnEvent write FOnEvent;
+    property Proc: TModelProc read FProc write FProc;
   end;
 
   // View
@@ -59,7 +61,7 @@ type
     procedure PerfomViewMessage(aMsg: string); virtual; abstract;
     procedure EventListener(aEventMsg: string); virtual; abstract;
     procedure CallView(aViewAbstractClass: TViewAbstractClass; aIsModal: Boolean = false);
-    procedure CallModel(aModelClass: TModelClass); virtual;
+    procedure CallModel(aModelClass: TModelClass; aProcName: string = ''); virtual;
   public
     procedure ReceiveViewMessage(aMsg: string; aViewSender: TViewAbstract);
     constructor Create(aMainView: TViewAbstract); virtual;
@@ -68,7 +70,7 @@ type
 
 implementation
 
-procedure TModelAbstract.CreateEvent(aEventMsg: string; aEventProc: TEventPerfom = nil);
+procedure TModelAbstract.CreateEvent(aEventMsg: string);
 begin
   //aEventProc;
   FOnEvent(aEventMsg);
@@ -89,14 +91,21 @@ begin
   inherited;
 end;
 
-procedure TControllerAbstract.CallModel(aModelClass: TModelClass);
+procedure TControllerAbstract.CallModel(aModelClass: TModelClass; aProcName: string = '');
 var
   Model: TModelAbstract;
 begin
   Model := aModelClass.Create(FData, FObjData);
   try
     Model.OnEvent := EventListener;
-    Model.Execute;
+
+    if aProcName = '' then
+      Model.Execute
+    else
+      begin
+        @Model.Proc := Model.MethodAddress(aProcName);
+        Model.Proc;
+      end;
   finally
     Model.Free;
   end;

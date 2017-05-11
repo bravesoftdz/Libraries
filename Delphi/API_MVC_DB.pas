@@ -5,12 +5,14 @@ interface
 uses
   System.Generics.Collections,
   API_MVC,
-  API_DB;
+  API_DB,
+  API_ORM;
 
 type
   TModelDB = class abstract(TModelAbstract)
   protected
     FDBEngine: TDBEngine;
+    function GetEntity(aEntityClass: TEntityAbstractClass; aID: integer): TEntityAbstract;
   public
     constructor Create(aData: TDictionary<string, variant>;
       aObjData: TObjectDictionary<string, TObject>); override;
@@ -25,7 +27,7 @@ type
     FDBEngineClass: TDBEngineClass;
     FConnectOnCreate: Boolean;
     procedure InitDB; virtual; abstract;
-    procedure CallModel(aModelClass: TModelClass); override;
+    procedure CallModel(aModelClass: TModelClass; aProcName: string = ''); override;
     function GetConnectParams(aFileName: String): TConnectParams;
   public
     constructor Create(aMainView: TViewAbstract); override;
@@ -37,6 +39,12 @@ implementation
 uses
   System.Classes;
 
+
+function TModelDB.GetEntity(aEntityClass: TEntityAbstractClass; aID: integer): TEntityAbstract;
+begin
+
+end;
+
 constructor TModelDB.Create(aData: TDictionary<string, variant>;
       aObjData: TObjectDictionary<string, TObject>);
 begin
@@ -45,7 +53,7 @@ begin
   FDBEngine := FObjData.Items['DBEngine'] as TDBEngine;
 end;
 
-procedure TControllerDB.CallModel(aModelClass: TModelClass);
+procedure TControllerDB.CallModel(aModelClass: TModelClass; aProcName: string = '');
 begin
   FObjData.Add('DBEngine', FDBEngine);
   inherited;
