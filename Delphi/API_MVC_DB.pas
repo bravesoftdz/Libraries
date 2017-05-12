@@ -5,14 +5,13 @@ interface
 uses
   System.Generics.Collections,
   API_MVC,
-  API_DB,
-  API_ORM;
+  API_DB;
 
 type
   TModelDB = class abstract(TModelAbstract)
   protected
     FDBEngine: TDBEngine;
-    function GetEntity(aEntityClass: TEntityAbstractClass; aID: integer): TEntityAbstract;
+    function GetEntity<T>(aID: integer = 0): T;
   public
     constructor Create(aData: TDictionary<string, variant>;
       aObjData: TObjectDictionary<string, TObject>); override;
@@ -37,12 +36,12 @@ type
 implementation
 
 uses
-  System.Classes;
+  System.Classes,
+  API_ORM;
 
-
-function TModelDB.GetEntity(aEntityClass: TEntityAbstractClass; aID: integer): TEntityAbstract;
+function TModelDB.GetEntity<T>(aID: integer = 0): T;
 begin
-
+  Result := TEntityAbstract(T).Create(aID);
 end;
 
 constructor TModelDB.Create(aData: TDictionary<string, variant>;
