@@ -4,6 +4,7 @@ interface
 
 uses
   System.Classes,
+  System.SysUtils,
   System.Generics.Collections,
   Vcl.Forms;
 
@@ -94,6 +95,7 @@ end;
 procedure TControllerAbstract.CallModel(aModelClass: TModelClass; aProcName: string = '');
 var
   Model: TModelAbstract;
+  ModelProc: TModelProc;
 begin
   Model := aModelClass.Create(FData, FObjData);
   try
@@ -103,11 +105,14 @@ begin
       Model.Execute
     else
       begin
-        @Model.Proc := Model.MethodAddress(aProcName);
-        Model.Proc;
+        TMethod(ModelProc).Code := Model.MethodAddress(aProcName);
+        TMethod(ModelProc).Data := Model;
+
+        if Assigned(ModelProc) then
+          ModelProc;
       end;
   finally
-    Model.Free;
+    FreeAndNil(Model);
   end;
 end;
 
