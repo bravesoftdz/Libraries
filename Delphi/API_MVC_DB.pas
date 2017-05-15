@@ -48,7 +48,7 @@ end;
 
 procedure TControllerDB.CallModel(aModelClass: TModelClass; aProcName: string = '');
 begin
-  FObjData.Add('DBEngine', FDBEngine);
+  FObjData.AddOrSetValue('DBEngine', FDBEngine);
   inherited;
 end;
 

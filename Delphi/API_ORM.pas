@@ -26,13 +26,11 @@ type
     procedure StoreToDB(aSQL: string);
     procedure InsertToDB(aChangedFields: TArray<string>);
     procedure UpdateToDB(aChangedFields: TArray<string>);
+    function GetID: integer;
   protected
     FDBEngine: TDBEngine;
     FFields: TArray<TDBField>;
     FData: TDictionary<string, variant>;
-
-    function GetID: integer;
-
     procedure InitFields; virtual; abstract;
     procedure AddField(aFieldName: string; aFieldType: TFieldType);
   public
@@ -41,14 +39,84 @@ type
     constructor Create(aDBEngine: TDBEngine; aID: integer = 0);
     destructor Destroy; override;
     property ID: integer read GetID;
+    property Data: TDictionary<string, variant> read FData;
+    property Fields: TArray<TDBField> read FFields;
   end;
 
   TEntityAbstractClass = class of TEntityAbstract;
+
+  TEntityList<T> = class(TObjectList<T>)
+  private
+    function GetWherePart(aFilters: TArray<string>): string;
+    function GetOrderPart(aOrder: TArray<string>): string;
+  protected
+    FEntityAbstractClass: TEntityAbstractClass;
+    procedure InitListClass; virtual; abstract;
+  public
+    constructor Create(aDBEngine: TDBEngine; aFilters, aOrder: TArray<string>);
+  end;
 
 implementation
 
 uses
   System.SysUtils;
+
+function TEntityList.GetWherePart(aFilters: TArray<string>): string;
+var
+  i: Integer;
+begin
+  Result := '1=1';
+  for i := 0 to Length(aFilters) - 1 do
+    begin
+      Result := Result + ' AND ';
+      Result := Result + aFilters[i];
+    end;
+end;
+
+function TEntityList.GetOrderPart(aOrder: TArray<string>): string;
+var
+  i: Integer;
+begin
+  Result := '';
+  for i := 0 to Length(aOrder) - 1 do
+    begin
+      Result := Result + aOrder[i];
+      Result := Result + ',';
+    end;
+
+  Result := Result + 'ID';
+end;
+
+constructor TEntityList.Create(aDBEngine: TDBEngine; aFilters, aOrder: TArray<string>);
+var
+  sql: string;
+  dsQuery: TFDQuery;
+  Entity: TEntityAbstract;
+begin
+  inherited Create(True);
+
+  InitListClass;
+  sql := 'select Id from %s where %s order by %s';
+  sql := Format(sql, [
+    FEntityAbstractClass.GetTableName,
+    GetWherePart(aFilters),
+    GetOrderPart(aOrder)
+  ]);
+
+  dsQuery := TFDQuery.Create(nil);
+  try
+    dsQuery.SQL.Text := sql;
+    aDBEngine.OpenQuery(dsQuery);
+    while not dsQuery.EOF do
+      begin
+        Entity := FEntityAbstractClass.Create(aDBEngine, dsQuery.FieldByName('Id').AsInteger);
+        Add(Entity);
+        dsQuery.Next;
+      end;
+  finally
+    dsQuery.Free;
+  end;
+end;
 
 procedure TEntityAbstract.StoreToDB(aSQL: string);
 var

@@ -73,7 +73,6 @@ implementation
 
 procedure TModelAbstract.CreateEvent(aEventMsg: string);
 begin
-  //aEventProc;
   FOnEvent(aEventMsg);
 end;
 
