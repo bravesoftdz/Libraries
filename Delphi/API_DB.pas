@@ -40,12 +40,21 @@ type
     procedure OpenQuery(aQuery: TFDQuery); overload;
     procedure OpenQuery(aQuery: TFDQuery; aSQL: string); overload;
 
+    procedure ExecQuery(aQuery: TFDQuery);
+
     destructor Destroy; override;
   end;
 
   TDBEngineClass = class of TDBEngine;
 
 implementation
+
+procedure TDBEngine.ExecQuery(aQuery: TFDQuery);
+begin
+  aQuery.Close;
+  aQuery.Connection := FDConnection;
+  aQuery.ExecSQL;
+end;
 
 procedure TDBEngine.OpenQuery(aQuery: TFDQuery);
 begin
