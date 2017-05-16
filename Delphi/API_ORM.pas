@@ -45,13 +45,10 @@ type
 
   TEntityAbstractClass = class of TEntityAbstract;
 
-  TEntityList<T> = class(TObjectList<T>)
+  TEntityList<T: TEntityAbstract> = class(TObjectList<T>)
   private
     function GetWherePart(aFilters: TArray<string>): string;
     function GetOrderPart(aOrder: TArray<string>): string;
-  protected
-    FEntityAbstractClass: TEntityAbstractClass;
-    procedure InitListClass; virtual; abstract;
   public
     constructor Create(aDBEngine: TDBEngine; aFilters, aOrder: TArray<string>);
   end;
@@ -61,7 +58,7 @@ implementation
 uses
   System.SysUtils;
 
-function TEntityList.GetWherePart(aFilters: TArray<string>): string;
+function TEntityList<T>.GetWherePart(aFilters: TArray<string>): string;
 var
   i: Integer;
 begin
@@ -73,7 +70,7 @@ begin
     end;
 end;
 
-function TEntityList.GetOrderPart(aOrder: TArray<string>): string;
+function TEntityList<T>.GetOrderPart(aOrder: TArray<string>): string;
 var
   i: Integer;
 begin
@@ -87,18 +84,19 @@ begin
   Result := Result + 'ID';
 end;
 
-constructor TEntityList.Create(aDBEngine: TDBEngine; aFilters, aOrder: TArray<string>);
+constructor TEntityList<T>.Create(aDBEngine: TDBEngine; aFilters, aOrder: TArray<string>);
 var
   sql: string;
   dsQuery: TFDQuery;
   Entity: TEntityAbstract;
+  EntityAbstractClass: TEntityAbstractClass;
 begin
   inherited Create(True);
 
-  InitListClass;
+  EntityAbstractClass := T;
   sql := 'select Id from %s where %s order by %s';
   sql := Format(sql, [
-    FEntityAbstractClass.GetTableName,
+    EntityAbstractClass.GetTableName,
     GetWherePart(aFilters),
     GetOrderPart(aOrder)
   ]);
@@ -109,7 +107,7 @@ begin
     aDBEngine.OpenQuery(dsQuery);
     while not dsQuery.EOF do
       begin
-        Entity := FEntityAbstractClass.Create(aDBEngine, dsQuery.FieldByName('Id').AsInteger);
+        Entity := EntityAbstractClass.Create(aDBEngine, dsQuery.FieldByName('Id').AsInteger);
         Add(Entity);
         dsQuery.Next;
       end;
