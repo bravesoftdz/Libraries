@@ -134,8 +134,8 @@ end;
 
 procedure TControllerAbstract.ReceiveViewMessage(aMsg: string; aViewSender: TViewAbstract);
 begin
-  FData.Clear;
-  FObjData.Clear;
+  //FData.Clear;
+  //FObjData.Clear;
   PerfomViewMessage(aMsg);
 end;
 

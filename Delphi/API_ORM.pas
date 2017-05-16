@@ -31,6 +31,7 @@ type
     FDBEngine: TDBEngine;
     FFields: TArray<TDBField>;
     FData: TDictionary<string, variant>;
+    //function GetOneToManyList<TItem, TList>: TList;
     procedure InitFields; virtual; abstract;
     procedure AddField(aFieldName: string; aFieldType: TFieldType);
   public
@@ -57,6 +58,11 @@ implementation
 
 uses
   System.SysUtils;
+
+//function TEntityAbstract.GetOneToManyList<TItem, TList>: TList;
+//begin
+
+//end;
 
 function TEntityList<T>.GetWherePart(aFilters: TArray<string>): string;
 var
