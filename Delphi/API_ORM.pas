@@ -48,10 +48,13 @@ type
 
   TEntityList<T: TEntityAbstract> = class(TObjectList<T>)
   private
+    FDBEngine: TDBEngine;
     function GetWherePart(aFilters: TArray<string>): string;
     function GetOrderPart(aOrder: TArray<string>): string;
+    procedure FillEntityList(aFilters, aOrder: TArray<string>);
   public
-    constructor Create(aDBEngine: TDBEngine; aFilters, aOrder: TArray<string>);
+    constructor Create(aDBEngine: TDBEngine; aFilters, aOrder: TArray<string>); overload;
+    constructor Create(aDBEngine: TDBEngine; aKeyField: string; aKeyValue: integer); overload;
   end;
 
 implementation
@@ -59,10 +62,16 @@ implementation
 uses
   System.SysUtils;
 
-//function TEntityAbstract.GetOneToManyList<TItem, TList>: TList;
-//begin
+constructor TEntityList<T>.Create(aDBEngine: TDBEngine; aKeyField: string; aKeyValue: integer);
+var
+  Filters: TArray<string>;
+begin
+  Filters := [Format('%s=%d', [aKeyField, aKeyValue])];
 
-//end;
+  inherited Create(True);
+  FDBEngine := aDBEngine;
+  FillEntityList(Filters, []);
+end;
 
 function TEntityList<T>.GetWherePart(aFilters: TArray<string>): string;
 var
@@ -90,15 +99,13 @@ begin
   Result := Result + 'ID';
 end;
 
-constructor TEntityList<T>.Create(aDBEngine: TDBEngine; aFilters, aOrder: TArray<string>);
+procedure TEntityList<T>.FillEntityList(aFilters, aOrder: TArray<string>);
 var
   sql: string;
   dsQuery: TFDQuery;
   Entity: TEntityAbstract;
   EntityAbstractClass: TEntityAbstractClass;
 begin
-  inherited Create(True);
-
   EntityAbstractClass := T;
   sql := 'select Id from %s where %s order by %s';
   sql := Format(sql, [
@@ -110,16 +117,23 @@ begin
   dsQuery := TFDQuery.Create(nil);
   try
     dsQuery.SQL.Text := sql;
-    aDBEngine.OpenQuery(dsQuery);
+    FDBEngine.OpenQuery(dsQuery);
     while not dsQuery.EOF do
       begin
-        Entity := EntityAbstractClass.Create(aDBEngine, dsQuery.FieldByName('Id').AsInteger);
+        Entity := EntityAbstractClass.Create(FDBEngine, dsQuery.FieldByName('Id').AsInteger);
         Add(Entity);
         dsQuery.Next;
       end;
   finally
     dsQuery.Free;
   end;
+end;
+
+constructor TEntityList<T>.Create(aDBEngine: TDBEngine; aFilters, aOrder: TArray<string>);
+begin
+  inherited Create(True);
+  FDBEngine := aDBEngine;
+  FillEntityList(aFilters, aOrder);
 end;
 
 procedure TEntityAbstract.StoreToDB(aSQL: string);

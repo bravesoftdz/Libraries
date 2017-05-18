@@ -18,7 +18,7 @@ type
   TControllerAbstract = class;
   TControllerClass = class of TControllerAbstract;
 
-  TModelProc = procedure of object;
+  TProc = procedure of object;
   TEventListener = procedure(aEventMsg: string) of object;
 
   // Model
@@ -27,14 +27,14 @@ type
     FData: TDictionary<string, variant>;
     FObjData: TObjectDictionary<string, TObject>;
     FOnEvent: TEventListener;
-    FProc: TModelProc;
+    FProc: TProc;
     procedure CreateEvent(aEventMsg: string);
   public
     procedure Execute; virtual; abstract;
     constructor Create(aData: TDictionary<string, variant>;
       aObjData: TObjectDictionary<string, TObject>); virtual;
     property OnEvent: TEventListener read FOnEvent write FOnEvent;
-    property Proc: TModelProc read FProc write FProc;
+    property Proc: TProc read FProc write FProc;
   end;
 
   // View
@@ -64,7 +64,7 @@ type
     procedure CallView(aViewAbstractClass: TViewAbstractClass; aIsModal: Boolean = false);
     procedure CallModel(aModelClass: TModelClass; aProcName: string = ''); virtual;
   public
-    procedure ReceiveViewMessage(aMsg: string; aViewSender: TViewAbstract);
+    procedure ReceiveViewMessage(aMsg: string);
     constructor Create(aMainView: TViewAbstract); virtual;
     destructor Destroy; override;
   end;
@@ -94,7 +94,7 @@ end;
 procedure TControllerAbstract.CallModel(aModelClass: TModelClass; aProcName: string = '');
 var
   Model: TModelAbstract;
-  ModelProc: TModelProc;
+  ModelProc: TProc;
 begin
   Model := aModelClass.Create(FData, FObjData);
   try
@@ -132,16 +132,22 @@ begin
     View.Show;
 end;
 
-procedure TControllerAbstract.ReceiveViewMessage(aMsg: string; aViewSender: TViewAbstract);
+procedure TControllerAbstract.ReceiveViewMessage(aMsg: string);
+var
+  ControllerProc: TProc;
 begin
-  //FData.Clear;
-  //FObjData.Clear;
-  PerfomViewMessage(aMsg);
+  TMethod(ControllerProc).Code := Self.MethodAddress(aMsg);
+  TMethod(ControllerProc).Data := Self;
+
+  if Assigned(ControllerProc) then
+    ControllerProc
+  else
+    PerfomViewMessage(aMsg);
 end;
 
 procedure TViewAbstract.SendMessage(aMsg: string);
 begin
-  FController.ReceiveViewMessage(aMsg, Self);
+  FController.ReceiveViewMessage(aMsg);
 end;
 
 constructor TControllerAbstract.Create(aMainView: TViewAbstract);
