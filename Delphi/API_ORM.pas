@@ -65,12 +65,14 @@ uses
 constructor TEntityList<T>.Create(aDBEngine: TDBEngine; aKeyField: string; aKeyValue: integer);
 var
   Filters: TArray<string>;
+  Order: TArray<string>;
 begin
   Filters := [Format('%s=%d', [aKeyField, aKeyValue])];
+  Order := [];
 
   inherited Create(True);
   FDBEngine := aDBEngine;
-  FillEntityList(Filters, []);
+  FillEntityList(Filters, Order);
 end;
 
 function TEntityList<T>.GetWherePart(aFilters: TArray<string>): string;
