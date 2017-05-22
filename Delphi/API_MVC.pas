@@ -21,6 +21,8 @@ type
   TProc = procedure of object;
   TEventListener = procedure(aEventMsg: string) of object;
 
+  {$M+}
+
   // Model
   TModelAbstract = class abstract
   protected
@@ -36,6 +38,8 @@ type
     property OnEvent: TEventListener read FOnEvent write FOnEvent;
     property Proc: TProc read FProc write FProc;
   end;
+
+  {$M-}
 
   // View
   TViewAbstract = class abstract(TForm)
