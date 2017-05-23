@@ -15,15 +15,11 @@ type
     FieldType: TFieldType;
   end;
 
-  TEntityList<T: class> = class abstract(TObjectList<T>)
-  private
-    FDBEngine: TDBEngine;
-    function GetWherePart(aFilters: TArray<string>): string;
-    function GetOrderPart(aOrder: TArray<string>): string;
-    procedure FillEntityList(aFilters, aOrder: TArray<string>);
-  public
-    constructor Create(aDBEngine: TDBEngine; aFilters, aOrder: TArray<string>); overload;
-    constructor Create(aDBEngine: TDBEngine; aKeyField: string; aKeyValue: integer); overload;
+  TListInfo = record
+    ListPointer: Pointer;
+    EntityItemClass: TClass;
+    MasterKeyField: string;
+    SlaveKeyField: string;
   end;
 
   TEntityAbstract = class abstract
@@ -41,10 +37,12 @@ type
   protected
     FDBEngine: TDBEngine;
     FFields: TArray<TDBField>;
-    FLists: TArray<Pointer>;
+    FLists: TArray<TListInfo>;
     FData: TDictionary<string, variant>;
+    function GetList<T>: T;
     procedure InitFields; virtual; abstract;
     procedure AddField(aFieldName: string; aFieldType: TFieldType);
+    procedure AddList(aListInfo: TListInfo);
   public
     procedure SaveEntity;
     procedure SaveAll;
@@ -58,22 +56,46 @@ type
 
   TEntityAbstractClass = class of TEntityAbstract;
 
+  TEntityList<T: TEntityAbstract> = class abstract(TObjectList<T>)
+  private
+    FDBEngine: TDBEngine;
+    FEntityClass: TEntityAbstractClass;
+    function GetWherePart(aFilters: TArray<string>): string;
+    function GetOrderPart(aOrder: TArray<string>): string;
+    procedure FillEntityList(aFilters, aOrder: TArray<string>);
+  public
+    constructor Create(aDBEngine: TDBEngine; aFilters, aOrder: TArray<string>); overload;
+    constructor Create(aDBEngine: TDBEngine; aKeyField: string; aKeyValue: integer); overload;
+    property EntityClass: TEntityAbstractClass read FEntityClass;
+  end;
+
 implementation
 
 uses eEntities,
   System.SysUtils;
 
+function TEntityAbstract.GetList<T>: T;
+begin
+
+end;
+
+procedure TEntityAbstract.AddList(aListInfo: TListInfo);
+begin
+  aListInfo.ListPointer := nil;
+  FLists := FLists + [aListInfo];
+end;
+
 procedure TEntityAbstract.SaveAll;
-var
-  ListPointer: ^TLevelList;
-  EntityList:  TLevelList;
+//var
+  //List: TOneToManyList;
+  //EntityList:  TLevelList;
   //EntityPointer: Pointer;
   //HasLists: Boolean;
 begin
-  for ListPointer in FLists do
+  {for List in FLists do
     begin
-      EntityList := ListPointer^;
-    end;
+      //EntityList := ListPointer^;
+    end;}
 end;
 
 constructor TEntityList<T>.Create(aDBEngine: TDBEngine; aKeyField: string; aKeyValue: integer);
@@ -120,13 +142,12 @@ var
   sql: string;
   dsQuery: TFDQuery;
   Entity: TEntityAbstract;
-  EntityClass: TEntityAbstractClass;
 begin
-  EntityClass := TEntityAbstractClass(T);
+  FEntityClass := T;
 
   sql := 'select Id from %s where %s order by %s';
   sql := Format(sql, [
-    EntityClass.GetTableName,
+    FEntityClass.GetTableName,
     GetWherePart(aFilters),
     GetOrderPart(aOrder)
   ]);
@@ -137,7 +158,7 @@ begin
     FDBEngine.OpenQuery(dsQuery);
     while not dsQuery.EOF do
       begin
-        Entity := EntityClass.Create(FDBEngine, dsQuery.FieldByName('Id').AsInteger);
+        Entity := FEntityClass.Create(FDBEngine, dsQuery.FieldByName('Id').AsInteger);
         Add(Entity);
         dsQuery.Next;
       end;
