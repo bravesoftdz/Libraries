@@ -1,4 +1,4 @@
-unit API_CRUD;
+unit API_ORM_Cntrls;
 
 interface
 
@@ -26,11 +26,25 @@ type
     property Entity: TEntityAbstract read FEntity;
   end;
 
+  TEntityPanelAbstract = class abstract(TPanel)
+  public
+    constructor Create(aOwner: TWinControl);
+    //procedure BuildControls(aEntity: TEntityAbstract);
+    //destructor Destroy; override;
+  end;
+
 implementation
 
 uses
   System.SysUtils,
   Data.DB;
+
+constructor TEntityPanelAbstract.Create(aOwner: TWinControl);
+begin
+  inherited Create(aOwner);
+  Self.Parent := aOwner;
+  Self.Align := alClient;
+end;
 
 destructor TCRUDPanelAbstract.Destroy;
 begin

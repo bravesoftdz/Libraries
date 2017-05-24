@@ -33,8 +33,10 @@ type
     FData: TDictionary<string, variant>;
     procedure InitFields; virtual; abstract;
     procedure AddField(aFieldName: string; aFieldType: TFieldType);
+    procedure SaveLists; virtual;
   public
     procedure SaveEntity;
+    procedure SaveAll;
     class function GetTableName: string; virtual; abstract;
     constructor Create(aDBEngine: TDBEngine; aID: integer = 0);
     destructor Destroy; override;
@@ -48,33 +50,16 @@ type
   TEntityList<T: TEntityAbstract> = class abstract(TObjectList<T>)
   private
     FDBEngine: TDBEngine;
-    FEntityClass: TEntityAbstractClass;
+    FKeyField: string;
+    FKeyValue: Integer;
     function GetWherePart(aFilters: TArray<string>): string;
     function GetOrderPart(aOrder: TArray<string>): string;
     procedure FillEntityList(aFilters, aOrder: TArray<string>);
   public
-    procedure DoSmth;
+    function FindByID(aID: integer): T;
+    procedure SaveList(aKeyValue: integer);
     constructor Create(aDBEngine: TDBEngine; aFilters, aOrder: TArray<string>); overload;
     constructor Create(aDBEngine: TDBEngine; aKeyField: string; aKeyValue: integer); overload;
-    property EntityClass: TEntityAbstractClass read FEntityClass;
-  end;
-
-  TListInfo = record
-    ListPointer: Pointer;
-    EntityClass: TEntityAbstractClass;
-    MasterKeyField: string;
-    SlaveKeyField: string;
-  end;
-
-  TEntity = class abstract(TEntityAbstract)
-  private
-    function GetListInfo(aEntityClass: TEntityAbstractClass; out aIndx: integer): TListInfo;
-  protected
-    FLists: TArray<TListInfo>;
-    function GetList<T: TEntityAbstract>: TEntityList<T>;
-    procedure AddList(aListInfo: TListInfo);
-  public
-    procedure SaveAll;
   end;
 
 implementation
@@ -82,62 +67,35 @@ implementation
 uses eEntities,
   System.SysUtils;
 
-procedure TEntityList<T>.DoSmth;
+function TEntityList<T>.FindByID(aID: integer): T;
 var
   Entity: T;
 begin
   for Entity in Self do
-
+    if Entity.ID = aID then Exit(Entity);
 end;
 
-function TEntity.GetListInfo(aEntityClass: TEntityAbstractClass; out aIndx: integer): TListInfo;
-var
-  ListInfo: TListInfo;
-  i: Integer;
+procedure TEntityAbstract.SaveLists;
 begin
-  i := 0;
-  for ListInfo in FLists do
+end;
+
+procedure TEntityList<T>.SaveList(aKeyValue: integer);
+var
+  Entity: T;
+begin
+  if aKeyValue = 0 then aKeyValue := FKeyValue;
+
+  for Entity in Self do
     begin
-      if ListInfo.EntityClass = aEntityClass then
-        begin
-          Result := ListInfo;
-          aIndx := i;
-        end;
-      Inc(i);
+      Entity.Data[FKeyField] := FKeyValue;
+      Entity.SaveAll;
     end;
 end;
 
-function TEntity.GetList<T>: TEntityList<T>;
-var
-  ListInfo: TListInfo;
-  EntityClass: TEntityAbstractClass;
-  SlaveKeyValue: Integer;
-  indx: Integer;
+procedure TEntityAbstract.SaveAll;
 begin
-  EntityClass := T;
-  ListInfo := GetListInfo(EntityClass, indx);
-
-  SlaveKeyValue := FData.Items[ListInfo.MasterKeyField];
-  Result := TEntityList<T>.Create(FDBEngine, ListInfo.SlaveKeyField, ID);
-  FLists[indx].ListPointer := @Result;
-end;
-
-procedure TEntity.AddList(aListInfo: TListInfo);
-begin
-  aListInfo.ListPointer := nil;
-  FLists := FLists + [aListInfo];
-end;
-
-procedure TEntity.SaveAll;
-var
-  ListInfo: TListInfo;
-begin
-  for ListInfo in FLists do
-    begin
-      //EntityList := ListPointer^;
-      //EntityList:=TEntityList<T>.Create();
-
-    end;
+  SaveEntity;
+  SaveLists;
 end;
 
 constructor TEntityList<T>.Create(aDBEngine: TDBEngine; aKeyField: string; aKeyValue: integer);
@@ -150,6 +108,8 @@ begin
 
   inherited Create(True);
   FDBEngine := aDBEngine;
+  FKeyField := aKeyField;
+  FKeyValue := aKeyValue;
   FillEntityList(Filters, Order);
 end;
 
@@ -184,12 +144,13 @@ var
   sql: string;
   dsQuery: TFDQuery;
   Entity: TEntityAbstract;
+  EntityClass: TEntityAbstractClass;
 begin
-  FEntityClass := T;
+  EntityClass := T;
 
   sql := 'select Id from %s where %s order by %s';
   sql := Format(sql, [
-    FEntityClass.GetTableName,
+    EntityClass.GetTableName,
     GetWherePart(aFilters),
     GetOrderPart(aOrder)
   ]);
@@ -200,7 +161,7 @@ begin
     FDBEngine.OpenQuery(dsQuery);
     while not dsQuery.EOF do
       begin
-        Entity := FEntityClass.Create(FDBEngine, dsQuery.FieldByName('Id').AsInteger);
+        Entity := EntityClass.Create(FDBEngine, dsQuery.FieldByName('Id').AsInteger);
         Add(Entity);
         dsQuery.Next;
       end;
