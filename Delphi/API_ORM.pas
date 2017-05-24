@@ -15,13 +15,6 @@ type
     FieldType: TFieldType;
   end;
 
-  TListInfo = record
-    ListPointer: Pointer;
-    EntityItemClass: TClass;
-    MasterKeyField: string;
-    SlaveKeyField: string;
-  end;
-
   TEntityAbstract = class abstract
   private
     function GetEntityRecordFromDB(aID: integer): TFDQuery;
@@ -37,15 +30,11 @@ type
   protected
     FDBEngine: TDBEngine;
     FFields: TArray<TDBField>;
-    FLists: TArray<TListInfo>;
     FData: TDictionary<string, variant>;
-    function GetList<T>: T;
     procedure InitFields; virtual; abstract;
     procedure AddField(aFieldName: string; aFieldType: TFieldType);
-    procedure AddList(aListInfo: TListInfo);
   public
     procedure SaveEntity;
-    procedure SaveAll;
     class function GetTableName: string; virtual; abstract;
     constructor Create(aDBEngine: TDBEngine; aID: integer = 0);
     destructor Destroy; override;
@@ -64,9 +53,28 @@ type
     function GetOrderPart(aOrder: TArray<string>): string;
     procedure FillEntityList(aFilters, aOrder: TArray<string>);
   public
+    procedure DoSmth;
     constructor Create(aDBEngine: TDBEngine; aFilters, aOrder: TArray<string>); overload;
     constructor Create(aDBEngine: TDBEngine; aKeyField: string; aKeyValue: integer); overload;
     property EntityClass: TEntityAbstractClass read FEntityClass;
+  end;
+
+  TListInfo = record
+    ListPointer: Pointer;
+    EntityClass: TEntityAbstractClass;
+    MasterKeyField: string;
+    SlaveKeyField: string;
+  end;
+
+  TEntity = class abstract(TEntityAbstract)
+  private
+    function GetListInfo(aEntityClass: TEntityAbstractClass; out aIndx: integer): TListInfo;
+  protected
+    FLists: TArray<TListInfo>;
+    function GetList<T: TEntityAbstract>: TEntityList<T>;
+    procedure AddList(aListInfo: TListInfo);
+  public
+    procedure SaveAll;
   end;
 
 implementation
@@ -74,28 +82,62 @@ implementation
 uses eEntities,
   System.SysUtils;
 
-function TEntityAbstract.GetList<T>: T;
+procedure TEntityList<T>.DoSmth;
+var
+  Entity: T;
 begin
+  for Entity in Self do
 
 end;
 
-procedure TEntityAbstract.AddList(aListInfo: TListInfo);
+function TEntity.GetListInfo(aEntityClass: TEntityAbstractClass; out aIndx: integer): TListInfo;
+var
+  ListInfo: TListInfo;
+  i: Integer;
+begin
+  i := 0;
+  for ListInfo in FLists do
+    begin
+      if ListInfo.EntityClass = aEntityClass then
+        begin
+          Result := ListInfo;
+          aIndx := i;
+        end;
+      Inc(i);
+    end;
+end;
+
+function TEntity.GetList<T>: TEntityList<T>;
+var
+  ListInfo: TListInfo;
+  EntityClass: TEntityAbstractClass;
+  SlaveKeyValue: Integer;
+  indx: Integer;
+begin
+  EntityClass := T;
+  ListInfo := GetListInfo(EntityClass, indx);
+
+  SlaveKeyValue := FData.Items[ListInfo.MasterKeyField];
+  Result := TEntityList<T>.Create(FDBEngine, ListInfo.SlaveKeyField, ID);
+  FLists[indx].ListPointer := @Result;
+end;
+
+procedure TEntity.AddList(aListInfo: TListInfo);
 begin
   aListInfo.ListPointer := nil;
   FLists := FLists + [aListInfo];
 end;
 
-procedure TEntityAbstract.SaveAll;
-//var
-  //List: TOneToManyList;
-  //EntityList:  TLevelList;
-  //EntityPointer: Pointer;
-  //HasLists: Boolean;
+procedure TEntity.SaveAll;
+var
+  ListInfo: TListInfo;
 begin
-  {for List in FLists do
+  for ListInfo in FLists do
     begin
       //EntityList := ListPointer^;
-    end;}
+      //EntityList:=TEntityList<T>.Create();
+
+    end;
 end;
 
 constructor TEntityList<T>.Create(aDBEngine: TDBEngine; aKeyField: string; aKeyValue: integer);
