@@ -26,11 +26,20 @@ type
     property Entity: TEntityAbstract read FEntity;
   end;
 
+  TEditChangeEvent = procedure(aEdit: TEdit) of object;
+
   TEntityPanelAbstract = class abstract(TPanel)
+  protected
+    FEntity: TEntityAbstract;
+    FAfterEditChange: TEditChangeEvent;
+    function GetFieldValue(aFieldName: string): string;
+    procedure CreateFieldControl(aDBField: TDBField; aNum: Integer);
+    procedure InitPanel; virtual;
+    procedure CntrlChange(Sender: TObject);
   public
     constructor Create(aOwner: TWinControl);
-    //procedure BuildControls(aEntity: TEntityAbstract);
-    //destructor Destroy; override;
+    procedure BuildControls(aEntity: TEntityAbstract);
+    property OnAfterEditChange: TEditChangeEvent read FAfterEditChange write FAfterEditChange;
   end;
 
 implementation
@@ -38,6 +47,69 @@ implementation
 uses
   System.SysUtils,
   Data.DB;
+
+procedure TEntityPanelAbstract.CntrlChange(Sender: TObject);
+var
+  FieldName: string;
+begin
+  FieldName := (Sender as TEdit).Name;
+  Delete(FieldName, 1, 5);
+  FEntity.Data.Items[FieldName] := (Sender as TEdit).Text;
+
+  FAfterEditChange(Sender as TEdit);
+end;
+
+procedure TEntityPanelAbstract.InitPanel;
+begin
+end;
+
+function TEntityPanelAbstract.GetFieldValue(aFieldName: string): string;
+begin
+  Result := FEntity.Data.Items[aFieldName];
+end;
+
+procedure TEntityPanelAbstract.CreateFieldControl(aDBField: TDBField; aNum: Integer);
+var
+  lblFieldTitle: TLabel;
+  edtControl: TEdit;
+begin
+  lblFieldTitle := TLabel.Create(Self);
+  lblFieldTitle.Name := 'lbl' + aDBField.FieldName;
+  lblFieldTitle.Parent := Self;
+  lblFieldTitle.Left := 10;
+  lblFieldTitle.Top := aNum * 42 + 6;
+  lblFieldTitle.Caption := aDBField.FieldName;
+
+  case aDBField.FieldType of
+    ftInteger, ftString:
+      begin
+        edtControl := TEdit.Create(Self);
+        edtControl.Name := 'cntrl' + aDBField.FieldName;
+        edtControl.Parent := Self;
+        edtControl.Left := 10;
+        edtControl.Top := aNum * 42 + 20;
+
+        edtControl.Text := GetFieldValue(aDBField.FieldName);
+        edtControl.OnChange := CntrlChange;
+      end;
+  end;
+end;
+
+procedure TEntityPanelAbstract.BuildControls(aEntity: TEntityAbstract);
+var
+  DBField: TDBField;
+  i: integer;
+begin
+  FEntity := aEntity;
+  InitPanel;
+
+  i := 0;
+  for DBField in FEntity.Fields do
+    begin
+      CreateFieldControl(DBField, i);
+      Inc(i);
+    end;
+end;
 
 constructor TEntityPanelAbstract.Create(aOwner: TWinControl);
 begin

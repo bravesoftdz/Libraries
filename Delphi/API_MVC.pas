@@ -6,7 +6,8 @@ uses
   System.Classes,
   System.SysUtils,
   System.Generics.Collections,
-  Vcl.Forms;
+  Vcl.Forms,
+  API_MVC_Bind;
 
 type
   TModelAbstract = class;
@@ -20,8 +21,6 @@ type
 
   TProc = procedure of object;
   TEventListener = procedure(aEventMsg: string) of object;
-
-  {$M+}
 
   // Model
   TModelAbstract = class abstract
@@ -39,13 +38,12 @@ type
     property Proc: TProc read FProc write FProc;
   end;
 
-  {$M-}
-
   // View
   TViewAbstract = class abstract(TForm)
   private
     FIsMainForm: Boolean;
   protected
+    FBindData: TBindData;
     FController: TControllerAbstract;
     FControllerClass: TControllerClass;
     procedure InitMVC; virtual; abstract;
@@ -55,7 +53,10 @@ type
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
+    property BindData: TBindData read FBindData;
   end;
+
+  {$M+}
 
   // Controller
   TControllerAbstract = class abstract
@@ -72,6 +73,8 @@ type
     constructor Create(aMainView: TViewAbstract); virtual;
     destructor Destroy; override;
   end;
+
+  {$M-}
 
 implementation
 
@@ -178,6 +181,8 @@ begin
       Self.InitMVC;
       FController := FControllerClass.Create(TViewAbstract(Self));
     end;
+
+  FBindData := TBindData.Create;
 end;
 
 destructor TViewAbstract.Destroy;
@@ -186,6 +191,8 @@ begin
     begin
       FController.Free;
     end;
+
+  FBindData.Free;
 
   inherited;
 end;
