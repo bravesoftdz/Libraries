@@ -10,6 +10,8 @@ uses
   API_DB;
 
 type
+  TFreeEvent = procedure of object;
+
   TDBField = record
     FieldName: string;
     FieldType: TFieldType;
@@ -17,6 +19,7 @@ type
 
   TEntityAbstract = class abstract
   private
+    FOnFree: TFreeEvent;
     function GetEntityRecordFromDB(aID: integer): TFDQuery;
     function CheckChanges(aFieldName: string; aCurrentRecord: TFDQuery): Boolean;
     function GetKeyValueString(aFields: TArray<string>): string;
@@ -36,6 +39,7 @@ type
     procedure SaveLists; virtual;
   public
     procedure SaveEntity;
+    procedure DeleteEntity;
     procedure SaveAll;
     class function GetTableName: string; virtual; abstract;
     constructor Create(aDBEngine: TDBEngine; aID: integer = 0);
@@ -43,6 +47,7 @@ type
     property ID: integer read GetID;
     property Data: TDictionary<string, variant> read FData;
     property Fields: TArray<TDBField> read FFields;
+    property OnFree: TFreeEvent read FOnFree write FOnFree;
   end;
 
   TEntityAbstractClass = class of TEntityAbstract;
@@ -52,20 +57,66 @@ type
     FDBEngine: TDBEngine;
     FKeyField: string;
     FKeyValue: Integer;
+    FDeletedIDs: TArray<Integer>;
     function GetWherePart(aFilters: TArray<string>): string;
     function GetOrderPart(aOrder: TArray<string>): string;
     procedure FillEntityList(aFilters, aOrder: TArray<string>);
+    procedure FreeList;
   public
     function FindByID(aID: integer): T;
     procedure SaveList(aKeyValue: integer);
+    procedure DeleteByID(aID: integer);
+    procedure DeleteByIndex(aIndex: integer);
     constructor Create(aDBEngine: TDBEngine; aFilters, aOrder: TArray<string>); overload;
-    constructor Create(aDBEngine: TDBEngine; aKeyField: string; aKeyValue: integer); overload;
+    constructor Create(aOwner: TEntityAbstract; aKeyField: string; aKeyValue: integer); overload;
   end;
 
 implementation
 
-uses eEntities,
+uses
+  System.Classes,
   System.SysUtils;
+
+procedure TEntityList<T>.FreeList;
+begin
+  Self.Free;
+end;
+
+procedure TEntityAbstract.DeleteEntity;
+var
+  dsQuery: TFDQuery;
+  sql: string;
+begin
+  dsQuery := TFDQuery.Create(nil);
+  try
+    sql := 'delete from %s where id=:id';
+    sql := Format(sql, [GetTableName]);
+    dsQuery.SQL.Text := sql;
+    dsQuery.ParamByName('id').AsInteger := ID;
+    FDBEngine.ExecQuery(dsQuery);
+  finally
+    dsQuery.Free;
+  end;
+end;
+
+procedure TEntityList<T>.DeleteByIndex(aIndex: integer);
+var
+  Entity: T;
+begin
+  Entity := Self.Items[aIndex];
+  if Entity.ID >0 then
+    FDeletedIDs := FDeletedIDs + [Entity.ID];
+  Self.Delete(aIndex);
+end;
+
+procedure TEntityList<T>.DeleteByID(aID: integer);
+var
+  Entity: T;
+begin
+  Entity := FindByID(aID);
+  FDeletedIDs := FDeletedIDs + [Entity.ID];
+  Self.Remove(Entity);
+end;
 
 function TEntityList<T>.FindByID(aID: integer): T;
 var
@@ -82,6 +133,9 @@ end;
 procedure TEntityList<T>.SaveList(aKeyValue: integer);
 var
   Entity: T;
+  DeleteEntity: TEntityAbstract;
+  EntityClass: TEntityAbstractClass;
+  ID, DeletedID: Integer;
 begin
   if aKeyValue = 0 then aKeyValue := FKeyValue;
 
@@ -89,6 +143,17 @@ begin
     begin
       Entity.Data[FKeyField] := FKeyValue;
       Entity.SaveAll;
+    end;
+
+  EntityClass := T;
+  for DeletedID in FDeletedIDs do
+    begin
+      DeleteEntity := EntityClass.Create(FDBEngine, DeletedID);
+      try
+        DeleteEntity.DeleteEntity;
+      finally
+        DeleteEntity.Free;
+      end;
     end;
 end;
 
@@ -98,7 +163,7 @@ begin
   SaveLists;
 end;
 
-constructor TEntityList<T>.Create(aDBEngine: TDBEngine; aKeyField: string; aKeyValue: integer);
+constructor TEntityList<T>.Create(aOwner: TEntityAbstract; aKeyField: string; aKeyValue: integer);
 var
   Filters: TArray<string>;
   Order: TArray<string>;
@@ -107,7 +172,8 @@ begin
   Order := [];
 
   inherited Create(True);
-  FDBEngine := aDBEngine;
+  FDBEngine := aOwner.FDBEngine;
+  aOwner.OnFree := FreeList;
   FKeyField := aKeyField;
   FKeyValue := aKeyValue;
   FillEntityList(Filters, Order);
@@ -195,6 +261,7 @@ function TEntityAbstract.GetFieldTypeByName(aFieldName: string): TFieldType;
 var
   DBField: TDBField;
 begin
+  Result := ftUnknown;
   for DBField in FFields do
     if DBField.FieldName = aFieldName then Exit(DBField.FieldType);
 end;
@@ -297,6 +364,7 @@ end;
 destructor TEntityAbstract.Destroy;
 begin
   FData.Free;
+  if Assigned(FOnFree) then FOnFree;
   inherited;
 end;
 

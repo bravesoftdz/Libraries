@@ -125,6 +125,7 @@ end;
 procedure TViewAbstract.FreeAfterClose(Sender: TObject; var Action: TCloseAction);
 begin
   Release;
+  SendMessage(Self.Name + 'Closed');
 end;
 
 procedure TControllerAbstract.CallView(aViewAbstractClass: TViewAbstractClass; aIsModal: Boolean = false);

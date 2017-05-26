@@ -26,6 +26,7 @@ var
   BindArray: TBindArray;
   Bind: TBind;
 begin
+  Result := 0;
   BindArray := Items[aKey];
 
   for Bind in BindArray do

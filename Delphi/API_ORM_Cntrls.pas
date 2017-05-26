@@ -39,6 +39,7 @@ type
   public
     constructor Create(aOwner: TWinControl);
     procedure BuildControls(aEntity: TEntityAbstract);
+    procedure ClearControls;
     property OnAfterEditChange: TEditChangeEvent read FAfterEditChange write FAfterEditChange;
   end;
 
@@ -47,6 +48,11 @@ implementation
 uses
   System.SysUtils,
   Data.DB;
+
+procedure TEntityPanelAbstract.ClearControls;
+begin
+  DestroyComponents;
+end;
 
 procedure TEntityPanelAbstract.CntrlChange(Sender: TObject);
 var
