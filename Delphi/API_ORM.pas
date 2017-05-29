@@ -10,11 +10,26 @@ uses
   API_DB;
 
 type
+  TEntityAbstract = class;
+  TEntityAbstractClass = class of TEntityAbstract;
   TFreeEvent = procedure of object;
 
   TDBField = record
     FieldName: string;
     FieldType: TFieldType;
+  end;
+
+  // One - To - One Relation
+  TRelation = record
+    Key: string;
+    ForeignKey: string;
+    EntityClass: TEntityAbstractClass;
+  end;
+
+  TEntityStruct = record
+    TableName: string;
+    FieldList: TArray<TDBField>;
+    RelatedList: TArray<TRelation>;
   end;
 
   TEntityAbstract = class abstract
@@ -25,6 +40,7 @@ type
     function GetKeyValueString(aFields: TArray<string>): string;
     function GetFieldTypeByName(aFieldName: string): TFieldType;
     procedure FillEntity(aID: integer);
+    procedure RelateExternalEntities;
     procedure SetParams(aParams: TFDParams);
     procedure StoreToDB(aSQL: string);
     procedure InsertToDB(aChangedFields: TArray<string>);
@@ -34,30 +50,33 @@ type
     FDBEngine: TDBEngine;
     FFields: TArray<TDBField>;
     FData: TDictionary<string, variant>;
-    procedure InitFields; virtual; abstract;
-    procedure AddField(aFieldName: string; aFieldType: TFieldType);
+    procedure RelateEntity(aEntity: TEntityAbstract; aField, aRelatedField: string);
     procedure SaveLists; virtual;
   public
     procedure SaveEntity;
     procedure DeleteEntity;
     procedure SaveAll;
-    class function GetTableName: string; virtual; abstract;
+    class function GetTableName: string;
+    class function GetEntityStruct: TEntityStruct; virtual; abstract;
+    class procedure AddField(var aFieldList: TArray<TDBField>; aFieldName: string; aFieldType: TFieldType);
+    class procedure AddRelation(var aRelatedList: TArray<TRelation>; aKey, aForeignKey: string;
+        aEntityClass: TEntityAbstractClass);
     constructor Create(aDBEngine: TDBEngine; aID: integer = 0);
     destructor Destroy; override;
     property ID: integer read GetID;
-    property Data: TDictionary<string, variant> read FData;
     property Fields: TArray<TDBField> read FFields;
+    property Data: TDictionary<string, variant> read FData;
     property OnFree: TFreeEvent read FOnFree write FOnFree;
   end;
 
-  TEntityAbstractClass = class of TEntityAbstract;
-
+  // One - To - Many Relation
   TEntityList<T: TEntityAbstract> = class abstract(TObjectList<T>)
   private
     FDBEngine: TDBEngine;
     FKeyField: string;
     FKeyValue: Integer;
     FDeletedIDs: TArray<Integer>;
+    function GetFromPart(aEntityStruct: TEntityStruct): string;
     function GetWherePart(aFilters: TArray<string>): string;
     function GetOrderPart(aOrder: TArray<string>): string;
     procedure FillEntityList(aFilters, aOrder: TArray<string>);
@@ -76,6 +95,49 @@ implementation
 uses
   System.Classes,
   System.SysUtils;
+
+function TEntityList<T>.GetFromPart(aEntityStruct: TEntityStruct): string;
+var
+  Relation: TRelation;
+  i: Integer;
+begin
+  Result := aEntityStruct.TableName + ' t1';
+
+  i := 1;
+  for Relation in aEntityStruct.RelatedList do
+    begin
+      Inc(i);
+      Result := Result + Format(' left join %s t%d on t%d.%s = t1.%s',
+        [Relation.EntityClass.GetTableName, i, i, Relation.Key, Relation.ForeignKey]
+      );
+    end;
+end;
+
+procedure TEntityAbstract.RelateExternalEntities;
+begin
+
+end;
+
+class procedure TEntityAbstract.AddRelation(var aRelatedList: TArray<TRelation>; aKey, aForeignKey: string;
+    aEntityClass: TEntityAbstractClass);
+var
+  Relation: TRelation;
+begin
+  Relation.Key := aKey;
+  Relation.ForeignKey := aForeignKey;
+  Relation.EntityClass := aEntityClass;
+  aRelatedList := aRelatedList + [Relation];
+end;
+
+class function TEntityAbstract.GetTableName: string;
+begin
+  Result := GetEntityStruct.TableName;
+end;
+
+procedure TEntityAbstract.RelateEntity(aEntity: TEntityAbstract; aField, aRelatedField: string);
+begin
+
+end;
 
 procedure TEntityList<T>.FreeList;
 begin
@@ -214,9 +276,9 @@ var
 begin
   EntityClass := T;
 
-  sql := 'select Id from %s where %s order by %s';
+  sql := 'select t1.Id from %s where %s order by %s';
   sql := Format(sql, [
-    EntityClass.GetTableName,
+    GetFromPart(EntityClass.GetEntityStruct),
     GetWherePart(aFilters),
     GetOrderPart(aOrder)
   ]);
@@ -394,14 +456,14 @@ begin
   end;
 end;
 
-procedure TEntityAbstract.AddField(aFieldName: string; aFieldType: TFieldType);
+class procedure TEntityAbstract.AddField(var aFieldList: TArray<TDBField>; aFieldName: string; aFieldType: TFieldType);
 var
   DBField: TDBField;
 begin
   DBField.FieldName := UpperCase(aFieldName);
   DBField.FieldType := aFieldType;
 
-  FFields := FFields + [DBField];
+  aFieldList := aFieldList + [DBField];
 end;
 
 function TEntityAbstract.GetID: integer;
@@ -413,11 +475,13 @@ constructor TEntityAbstract.Create(aDBEngine: TDBEngine; aID: Integer = 0);
 begin
   FDBEngine := aDBEngine;
 
-  AddField('Id', ftInteger);
-  InitFields;
+  AddField(FFields, 'ID', ftInteger);
+  FFields := FFields + GetEntityStruct.FieldList;
 
   FData := TDictionary<string, variant>.Create;
-  FillEntity(aID)
+  FillEntity(aID);
+
+  RelateExternalEntities;
 end;
 
 end.
