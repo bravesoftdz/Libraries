@@ -42,6 +42,7 @@ type
 
     procedure ExecQuery(aQuery: TFDQuery);
 
+    function GetLastInsertedID: integer; virtual; abstract;
     destructor Destroy; override;
   end;
 

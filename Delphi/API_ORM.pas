@@ -41,6 +41,7 @@ type
     function GetFieldTypeByName(aFieldName: string): TFieldType;
     procedure FillEntity(aID: integer);
     procedure RelateExternalEntities;
+    procedure SaveRelations;
     procedure SetParams(aParams: TFDParams);
     procedure StoreToDB(aSQL: string);
     procedure InsertToDB(aChangedFields: TArray<string>);
@@ -49,8 +50,8 @@ type
   protected
     FDBEngine: TDBEngine;
     FFields: TArray<TDBField>;
+    FRelations: TObjectDictionary<string, TEntityAbstract>;
     FData: TDictionary<string, variant>;
-    procedure RelateEntity(aEntity: TEntityAbstract; aField, aRelatedField: string);
     procedure SaveLists; virtual;
   public
     procedure SaveEntity;
@@ -66,6 +67,7 @@ type
     property ID: integer read GetID;
     property Fields: TArray<TDBField> read FFields;
     property Data: TDictionary<string, variant> read FData;
+    property Relations: TObjectDictionary<string, TEntityAbstract> read FRelations;
     property OnFree: TFreeEvent read FOnFree write FOnFree;
   end;
 
@@ -81,6 +83,7 @@ type
     function GetOrderPart(aOrder: TArray<string>): string;
     procedure FillEntityList(aFilters, aOrder: TArray<string>);
     procedure FreeList;
+    procedure UpdateKeys(aEntity: TEntityAbstract; aKeyField: string; aValue: integer);
   public
     function FindByID(aID: integer): T;
     procedure SaveList(aKeyValue: integer);
@@ -95,6 +98,41 @@ implementation
 uses
   System.Classes,
   System.SysUtils;
+
+procedure TEntityAbstract.SaveRelations;
+var
+  Pair: TPair<string, TEntityAbstract>;
+  Relation: TRelation;
+begin
+  if FRelations.Count = 0 then Exit;
+
+  for Pair in FRelations do
+    begin
+      Pair.Value.SaveEntity;
+      for Relation in GetEntityStruct.RelatedList do
+        if Pair.Value is Relation.EntityClass then
+          begin
+            FData.Items[Relation.ForeignKey] := Pair.Value.Data[Relation.Key];
+          end;
+    end;
+end;
+
+procedure TEntityList<T>.UpdateKeys(aEntity: TEntityAbstract; aKeyField: string; aValue: integer);
+var
+  Pair: TPair<string, TEntityAbstract>;
+  RelatedEntity: TEntityAbstract;
+begin
+  if aEntity.Data.ContainsKey(aKeyField) then
+    aEntity.Data[aKeyField] := aValue
+  else
+    begin
+      for Pair in aEntity.FRelations do
+        begin
+          if Pair.Value.Data.ContainsKey(aKeyField) then
+            Pair.Value.Data[aKeyField] := aValue;
+        end;
+    end;
+end;
 
 function TEntityList<T>.GetFromPart(aEntityStruct: TEntityStruct): string;
 var
@@ -114,8 +152,16 @@ begin
 end;
 
 procedure TEntityAbstract.RelateExternalEntities;
+var
+  Relation: TRelation;
 begin
-
+  for Relation in GetEntityStruct.RelatedList do
+    begin
+      FRelations.AddOrSetValue(
+        Relation.EntityClass.GetTableName,
+        Relation.EntityClass.Create(FDBEngine, FData.Items[Relation.ForeignKey])
+      );
+    end;
 end;
 
 class procedure TEntityAbstract.AddRelation(var aRelatedList: TArray<TRelation>; aKey, aForeignKey: string;
@@ -132,11 +178,6 @@ end;
 class function TEntityAbstract.GetTableName: string;
 begin
   Result := GetEntityStruct.TableName;
-end;
-
-procedure TEntityAbstract.RelateEntity(aEntity: TEntityAbstract; aField, aRelatedField: string);
-begin
-
 end;
 
 procedure TEntityList<T>.FreeList;
@@ -203,7 +244,8 @@ begin
 
   for Entity in Self do
     begin
-      Entity.Data[FKeyField] := FKeyValue;
+      UpdateKeys(Entity, FKeyField, aKeyValue);
+
       Entity.SaveAll;
     end;
 
@@ -221,6 +263,7 @@ end;
 
 procedure TEntityAbstract.SaveAll;
 begin
+  SaveRelations;
   SaveEntity;
   SaveLists;
 end;
@@ -348,7 +391,7 @@ begin
   for i := 0 to Length(aFields) - 1 do
     begin
       if i > 0 then Result := Result + ',';
-      Result := Result + Format('%s = :%s', [aFields[i], aFields[i]]);
+      Result := Result + Format('`%s` = :%s', [aFields[i], aFields[i]]);
     end;
 end;
 
@@ -360,6 +403,7 @@ begin
   sql := Format(sql, [GetTableName, GetKeyValueString(aChangedFields)]);
 
   StoreToDB(sql);
+  FData['ID'] := FDBEngine.GetLastInsertedID;
 end;
 
 procedure TEntityAbstract.UpdateToDB(aChangedFields: TArray<string>);
@@ -426,6 +470,7 @@ end;
 destructor TEntityAbstract.Destroy;
 begin
   FData.Free;
+  FRelations.Free;
   if Assigned(FOnFree) then FOnFree;
   inherited;
 end;
@@ -481,6 +526,7 @@ begin
   FData := TDictionary<string, variant>.Create;
   FillEntity(aID);
 
+  FRelations := TObjectDictionary<string, TEntityAbstract>.Create;
   RelateExternalEntities;
 end;
 

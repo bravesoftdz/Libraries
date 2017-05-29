@@ -7,6 +7,7 @@ uses
   Vcl.ExtCtrls,
   Vcl.StdCtrls,
   Vcl.Controls,
+  Vcl.Forms,
   API_ORM;
 
 type
@@ -28,7 +29,10 @@ type
 
   TEditChangeEvent = procedure(aEdit: TEdit) of object;
 
-  TEntityPanelAbstract = class abstract(TPanel)
+  TEntityPanelAbstract = class abstract(TScrollBox)
+  private
+    FFieldsCount: integer;
+    procedure CreateEntityFields;
   protected
     FEntity: TEntityAbstract;
     FAfterEditChange: TEditChangeEvent;
@@ -47,7 +51,19 @@ implementation
 
 uses
   System.SysUtils,
+  System.Generics.Collections,
   Data.DB;
+
+procedure TEntityPanelAbstract.CreateEntityFields;
+var
+  DBField: TDBField;
+begin
+  for DBField in FEntity.Fields do
+    begin
+      CreateFieldControl(DBField, FFieldsCount);
+      Inc(FFieldsCount);
+    end;
+end;
 
 procedure TEntityPanelAbstract.ClearControls;
 begin
@@ -57,10 +73,17 @@ end;
 procedure TEntityPanelAbstract.CntrlChange(Sender: TObject);
 var
   FieldName: string;
+  Pair: TPair<string, TEntityAbstract>;
 begin
   FieldName := (Sender as TEdit).Name;
   Delete(FieldName, 1, 5);
-  FEntity.Data.Items[FieldName] := (Sender as TEdit).Text;
+
+  if FEntity.Data.ContainsKey(FieldName) then
+    FEntity.Data.Items[FieldName] := (Sender as TEdit).Text
+  else
+    for Pair in FEntity.Relations do
+      if Pair.Value.Data.ContainsKey(FieldName) then
+        Pair.Value.Data.Items[FieldName] := (Sender as TEdit).Text;
 
   FAfterEditChange(Sender as TEdit);
 end;
@@ -78,9 +101,16 @@ procedure TEntityPanelAbstract.CreateFieldControl(aDBField: TDBField; aNum: Inte
 var
   lblFieldTitle: TLabel;
   edtControl: TEdit;
+  CntrlName: string;
 begin
   lblFieldTitle := TLabel.Create(Self);
-  lblFieldTitle.Name := 'lbl' + aDBField.FieldName;
+
+  CntrlName := 'lbl' + aDBField.FieldName;
+  if Self.FindComponent(CntrlName) = nil then
+    lblFieldTitle.Name := CntrlName
+  else
+    lblFieldTitle.Name := CntrlName + '_2';
+
   lblFieldTitle.Parent := Self;
   lblFieldTitle.Left := 10;
   lblFieldTitle.Top := aNum * 42 + 6;
@@ -90,7 +120,13 @@ begin
     ftInteger, ftString:
       begin
         edtControl := TEdit.Create(Self);
-        edtControl.Name := 'cntrl' + aDBField.FieldName;
+
+        CntrlName := 'cntrl' + aDBField.FieldName;
+        if Self.FindComponent(CntrlName) = nil then
+          edtControl.Name := CntrlName
+        else
+          edtControl.Name := CntrlName + '_2';
+
         edtControl.Parent := Self;
         edtControl.Left := 10;
         edtControl.Top := aNum * 42 + 20;
@@ -103,18 +139,21 @@ end;
 
 procedure TEntityPanelAbstract.BuildControls(aEntity: TEntityAbstract);
 var
-  DBField: TDBField;
-  i: integer;
+  Pair: TPair<string, TEntityAbstract>;
 begin
-  FEntity := aEntity;
   InitPanel;
+  FFieldsCount := 0;
 
-  i := 0;
-  for DBField in FEntity.Fields do
+  FEntity := aEntity;
+  CreateEntityFields;
+
+  for Pair in aEntity.Relations  do
     begin
-      CreateFieldControl(DBField, i);
-      Inc(i);
+      FEntity := Pair.Value;
+      CreateEntityFields;
     end;
+
+  FEntity := aEntity;
 end;
 
 constructor TEntityPanelAbstract.Create(aOwner: TWinControl);
