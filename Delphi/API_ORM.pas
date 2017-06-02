@@ -89,6 +89,7 @@ type
     procedure SaveList(aKeyValue: integer);
     procedure DeleteByID(aID: integer);
     procedure DeleteByIndex(aIndex: integer);
+    procedure DeleteAll;
     constructor Create(aDBEngine: TDBEngine; aFilters, aOrder: TArray<string>); overload;
     constructor Create(aOwner: TEntityAbstract; aKeyField: string; aKeyValue: integer); overload;
   end;
@@ -99,6 +100,16 @@ uses
   System.Classes,
   System.SysUtils;
 
+procedure TEntityList<T>.DeleteAll;
+var
+  Entity: T;
+begin
+  for Entity in Self do
+    if Entity.ID > 0 then
+      FDeletedIDs := FDeletedIDs + [Entity.ID];
+  Self.Clear;
+end;
+
 procedure TEntityAbstract.SaveRelations;
 var
   Pair: TPair<string, TEntityAbstract>;
@@ -108,7 +119,7 @@ begin
 
   for Pair in FRelations do
     begin
-      Pair.Value.SaveEntity;
+      Pair.Value.SaveAll;
       for Relation in GetEntityStruct.RelatedList do
         if Pair.Value is Relation.EntityClass then
           begin
@@ -207,7 +218,7 @@ var
   Entity: T;
 begin
   Entity := Self.Items[aIndex];
-  if Entity.ID >0 then
+  if Entity.ID > 0 then
     FDeletedIDs := FDeletedIDs + [Entity.ID];
   Self.Delete(aIndex);
 end;
