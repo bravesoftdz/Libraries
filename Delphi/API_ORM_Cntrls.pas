@@ -27,7 +27,7 @@ type
     property Entity: TEntityAbstract read FEntity;
   end;
 
-  TEditChangeEvent = procedure(aEdit: TEdit) of object;
+  TEditChangeEvent = procedure(aEdit: TControl) of object;
 
   TEntityPanelAbstract = class abstract(TScrollBox)
   private
@@ -36,7 +36,8 @@ type
   protected
     FEntity: TEntityAbstract;
     FAfterEditChange: TEditChangeEvent;
-    function GetFieldValue(aFieldName: string): string;
+    function GetStringValue(aFieldName: string): string;
+    function GetIntegerValue(aFieldName: string): integer;
     procedure CreateFieldControl(aDBField: TDBField; aNum: Integer);
     procedure InitPanel; virtual;
     procedure CntrlChange(Sender: TObject);
@@ -75,24 +76,39 @@ var
   FieldName: string;
   Pair: TPair<string, TEntityAbstract>;
 begin
-  FieldName := (Sender as TEdit).Name;
+  FieldName := (Sender as TControl).Name;
   Delete(FieldName, 1, 5);
 
   if FEntity.Data.ContainsKey(FieldName) then
-    FEntity.Data.Items[FieldName] := (Sender as TEdit).Text
+    begin
+      if Sender is TEdit then
+        FEntity.Data.Items[FieldName] := (Sender as TEdit).Text;
+      if Sender is TColorBox then
+        FEntity.Data.Items[FieldName] := (Sender as TColorBox).Selected;
+    end
   else
     for Pair in FEntity.Relations do
       if Pair.Value.Data.ContainsKey(FieldName) then
-        Pair.Value.Data.Items[FieldName] := (Sender as TEdit).Text;
+        begin
+          if Sender is TEdit then
+            Pair.Value.Data.Items[FieldName] := (Sender as TEdit).Text;
+          if Sender is TColorBox then
+            Pair.Value.Data.Items[FieldName] := (Sender as TColorBox).Selected;
+        end;
 
-  FAfterEditChange(Sender as TEdit);
+  FAfterEditChange(Sender as TControl);
 end;
 
 procedure TEntityPanelAbstract.InitPanel;
 begin
 end;
 
-function TEntityPanelAbstract.GetFieldValue(aFieldName: string): string;
+function TEntityPanelAbstract.GetStringValue(aFieldName: string): string;
+begin
+  Result := FEntity.Data.Items[aFieldName];
+end;
+
+function TEntityPanelAbstract.GetIntegerValue(aFieldName: string): integer;
 begin
   Result := FEntity.Data.Items[aFieldName];
 end;
@@ -101,6 +117,7 @@ procedure TEntityPanelAbstract.CreateFieldControl(aDBField: TDBField; aNum: Inte
 var
   lblFieldTitle: TLabel;
   edtControl: TEdit;
+  clrbxControl: TColorBox;
   CntrlName: string;
 begin
   lblFieldTitle := TLabel.Create(Self);
@@ -119,20 +136,34 @@ begin
   case aDBField.FieldType of
     ftInteger, ftString:
       begin
-        edtControl := TEdit.Create(Self);
+        if aDBField.FieldName.Contains('COLOR') then
+          begin
+            clrbxControl := TColorBox.Create(Self);
 
-        CntrlName := 'cntrl' + aDBField.FieldName;
-        if Self.FindComponent(CntrlName) = nil then
-          edtControl.Name := CntrlName
+            clrbxControl.Name := 'cntrl' + aDBField.FieldName;
+            clrbxControl.Parent := Self;
+            clrbxControl.Left := 10;
+            clrbxControl.Top := aNum * 42 + 20;
+            clrbxControl.Selected := GetIntegerValue(aDBField.FieldName);
+            clrbxControl.OnChange := CntrlChange;
+          end
         else
-          edtControl.Name := CntrlName + '_2';
+          begin
+            edtControl := TEdit.Create(Self);
 
-        edtControl.Parent := Self;
-        edtControl.Left := 10;
-        edtControl.Top := aNum * 42 + 20;
+            CntrlName := 'cntrl' + aDBField.FieldName;
+            if Self.FindComponent(CntrlName) = nil then
+              edtControl.Name := CntrlName
+            else
+              edtControl.Name := CntrlName + '_2';
 
-        edtControl.Text := GetFieldValue(aDBField.FieldName);
-        edtControl.OnChange := CntrlChange;
+            edtControl.Parent := Self;
+            edtControl.Left := 10;
+            edtControl.Top := aNum * 42 + 20;
+
+            edtControl.Text := GetStringValue(aDBField.FieldName);
+            edtControl.OnChange := CntrlChange;
+          end;
       end;
   end;
 end;
