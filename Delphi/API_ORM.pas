@@ -21,7 +21,7 @@ type
 
   // One - To - One Relation
   TRelation = record
-    Key: string;
+    ExtKey: string;
     ForeignKey: string;
     EntityClass: TEntityAbstractClass;
   end;
@@ -39,6 +39,7 @@ type
     function CheckChanges(aFieldName: string; aCurrentRecord: TFDQuery): Boolean;
     function GetKeyValueString(aFields: TArray<string>): string;
     function GetFieldTypeByName(aFieldName: string): TFieldType;
+    function GetExtIDByExtKey(aRelation: TRelation): Integer;
     procedure FillEntity(aID: integer);
     procedure RelateExternalEntities;
     procedure SaveRelations;
@@ -60,7 +61,7 @@ type
     class function GetTableName: string;
     class function GetEntityStruct: TEntityStruct; virtual; abstract;
     class procedure AddField(var aFieldList: TArray<TDBField>; aFieldName: string; aFieldType: TFieldType);
-    class procedure AddRelation(var aRelatedList: TArray<TRelation>; aKey, aForeignKey: string;
+    class procedure AddRelation(var aRelatedList: TArray<TRelation>; aExtKey, aForeignKey: string;
         aEntityClass: TEntityAbstractClass);
     constructor Create(aDBEngine: TDBEngine; aID: integer = 0);
     destructor Destroy; override;
@@ -100,6 +101,24 @@ uses
   System.Classes,
   System.SysUtils;
 
+function TEntityAbstract.GetExtIDByExtKey(aRelation: TRelation): Integer;
+var
+  dsQuery: TFDQuery;
+begin
+  dsQuery := TFDQuery.Create(nil);
+  try
+    dsQuery.SQL.Text := Format('select Id from %s where %s = :FKValue',
+      [aRelation.EntityClass.GetTableName, aRelation.ExtKey]
+    );
+    dsQuery.ParamByName('FKValue').AsInteger := ID;
+    FDBEngine.OpenQuery(dsQuery);
+
+    Result := dsQuery.FieldByName('Id').AsInteger;
+  finally
+    dsQuery.Free;
+  end;
+end;
+
 procedure TEntityList<T>.DeleteAll;
 var
   Entity: T;
@@ -123,7 +142,7 @@ begin
       for Relation in GetEntityStruct.RelatedList do
         if Pair.Value is Relation.EntityClass then
           begin
-            FData.Items[Relation.ForeignKey] := Pair.Value.Data[Relation.Key];
+            FData.Items[Relation.ForeignKey] := Pair.Value.Data[Relation.ExtKey];
           end;
     end;
 end;
@@ -157,7 +176,7 @@ begin
     begin
       Inc(i);
       Result := Result + Format(' left join %s t%d on t%d.%s = t1.%s',
-        [Relation.EntityClass.GetTableName, i, i, Relation.Key, Relation.ForeignKey]
+        [Relation.EntityClass.GetTableName, i, i, Relation.ExtKey, Relation.ForeignKey]
       );
     end;
 end;
@@ -165,22 +184,29 @@ end;
 procedure TEntityAbstract.RelateExternalEntities;
 var
   Relation: TRelation;
+  ExtID: Integer;
 begin
   for Relation in GetEntityStruct.RelatedList do
     begin
+      if Relation.ForeignKey = '' then
+        ExtID := GetExtIDByExtKey(Relation)
+      else
+        ExtID := FData.Items[Relation.ForeignKey];
+
+
       FRelations.AddOrSetValue(
         Relation.EntityClass.GetTableName,
-        Relation.EntityClass.Create(FDBEngine, FData.Items[Relation.ForeignKey])
+        Relation.EntityClass.Create(FDBEngine, ExtID)
       );
     end;
 end;
 
-class procedure TEntityAbstract.AddRelation(var aRelatedList: TArray<TRelation>; aKey, aForeignKey: string;
+class procedure TEntityAbstract.AddRelation(var aRelatedList: TArray<TRelation>; aExtKey, aForeignKey: string;
     aEntityClass: TEntityAbstractClass);
 var
   Relation: TRelation;
 begin
-  Relation.Key := aKey;
+  Relation.ExtKey := aExtKey;
   Relation.ForeignKey := aForeignKey;
   Relation.EntityClass := aEntityClass;
   aRelatedList := aRelatedList + [Relation];
