@@ -42,7 +42,8 @@ type
     function GetExtIDByExtKey(aRelation: TRelation): Integer;
     procedure FillEntity(aID: integer);
     procedure RelateExternalEntities;
-    procedure SaveRelations;
+    procedure SaveSlaveToMasterRelations;
+    procedure SaveMasterToSlaveRelations;
     procedure SetParams(aParams: TFDParams);
     procedure StoreToDB(aSQL: string);
     procedure InsertToDB(aChangedFields: TArray<string>);
@@ -92,7 +93,7 @@ type
     procedure DeleteByIndex(aIndex: integer);
     procedure DeleteAll;
     constructor Create(aDBEngine: TDBEngine; aFilters, aOrder: TArray<string>); overload;
-    constructor Create(aOwner: TEntityAbstract; aKeyField: string; aKeyValue: integer); overload;
+    constructor Create(aOwner: TEntityAbstract; aKeyField: string; aKeyValue: integer; aOrderKey: string = ''); overload;
   end;
 
 implementation
@@ -100,6 +101,24 @@ implementation
 uses
   System.Classes,
   System.SysUtils;
+
+procedure TEntityAbstract.SaveMasterToSlaveRelations;
+var
+  Pair: TPair<string, TEntityAbstract>;
+  Relation: TRelation;
+begin
+  for Pair in FRelations do
+    for Relation in GetEntityStruct.RelatedList do
+      begin
+        if Relation.ForeignKey <> '' then Continue;
+
+        if Pair.Value is Relation.EntityClass then
+          begin
+            Pair.Value.Data[Relation.ExtKey] := ID;
+            Pair.Value.SaveAll;
+          end;
+      end;
+end;
 
 function TEntityAbstract.GetExtIDByExtKey(aRelation: TRelation): Integer;
 var
@@ -129,22 +148,20 @@ begin
   Self.Clear;
 end;
 
-procedure TEntityAbstract.SaveRelations;
+procedure TEntityAbstract.SaveSlaveToMasterRelations;
 var
   Pair: TPair<string, TEntityAbstract>;
   Relation: TRelation;
 begin
-  if FRelations.Count = 0 then Exit;
-
   for Pair in FRelations do
-    begin
-      Pair.Value.SaveAll;
-      for Relation in GetEntityStruct.RelatedList do
-        if Pair.Value is Relation.EntityClass then
-          begin
-            FData.Items[Relation.ForeignKey] := Pair.Value.Data[Relation.ExtKey];
-          end;
-    end;
+    for Relation in GetEntityStruct.RelatedList do
+      if Pair.Value is Relation.EntityClass then
+        begin
+          if Relation.ForeignKey = '' then Continue;
+
+          Pair.Value.SaveAll;
+          FData.Items[Relation.ForeignKey] := Pair.Value.Data[Relation.ExtKey];
+        end;
 end;
 
 procedure TEntityList<T>.UpdateKeys(aEntity: TEntityAbstract; aKeyField: string; aValue: integer);
@@ -168,6 +185,7 @@ function TEntityList<T>.GetFromPart(aEntityStruct: TEntityStruct): string;
 var
   Relation: TRelation;
   i: Integer;
+  ForeignKey: string;
 begin
   Result := aEntityStruct.TableName + ' t1';
 
@@ -175,8 +193,13 @@ begin
   for Relation in aEntityStruct.RelatedList do
     begin
       Inc(i);
+      if Relation.ForeignKey = '' then
+        ForeignKey := 'id'
+      else
+        ForeignKey := Relation.ForeignKey;
+
       Result := Result + Format(' left join %s t%d on t%d.%s = t1.%s',
-        [Relation.EntityClass.GetTableName, i, i, Relation.ExtKey, Relation.ForeignKey]
+        [Relation.EntityClass.GetTableName, i, i, Relation.ExtKey, ForeignKey]
       );
     end;
 end;
@@ -194,10 +217,16 @@ begin
         ExtID := FData.Items[Relation.ForeignKey];
 
 
-      FRelations.AddOrSetValue(
-        Relation.EntityClass.GetTableName,
-        Relation.EntityClass.Create(FDBEngine, ExtID)
-      );
+      if ExtID > 0 then
+        FRelations.AddOrSetValue(
+          Relation.EntityClass.GetTableName,
+          Relation.EntityClass.Create(FDBEngine, ExtID)
+        )
+      else
+        FRelations.AddOrSetValue(
+          Relation.EntityClass.GetTableName,
+          nil
+        );
     end;
 end;
 
@@ -300,18 +329,23 @@ end;
 
 procedure TEntityAbstract.SaveAll;
 begin
-  SaveRelations;
+  SaveSlaveToMasterRelations;
   SaveEntity;
+  SaveMasterToSlaveRelations;
   SaveLists;
 end;
 
-constructor TEntityList<T>.Create(aOwner: TEntityAbstract; aKeyField: string; aKeyValue: integer);
+constructor TEntityList<T>.Create(aOwner: TEntityAbstract; aKeyField: string; aKeyValue: Integer; aOrderKey: string = '');
 var
   Filters: TArray<string>;
   Order: TArray<string>;
 begin
   Filters := [Format('%s=%d', [aKeyField, aKeyValue])];
-  Order := [];
+
+  if aOrderKey <> '' then
+    Order := [aOrderKey]
+  else
+    Order := [];
 
   inherited Create(True);
   FDBEngine := aOwner.FDBEngine;

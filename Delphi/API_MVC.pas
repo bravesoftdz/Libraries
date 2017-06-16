@@ -72,6 +72,7 @@ type
     procedure ReceiveViewMessage(aMsg: string);
     constructor Create(aMainView: TViewAbstract); virtual;
     destructor Destroy; override;
+    property ObjData: TObjectDictionary<string, TObject> read FObjData;
   end;
 
   {$M-}
