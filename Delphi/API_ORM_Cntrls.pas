@@ -181,7 +181,7 @@ begin
   for Pair in aEntity.Relations  do
     begin
       FEntity := Pair.Value;
-      CreateEntityFields;
+      if Assigned(FEntity) then CreateEntityFields;
     end;
 
   FEntity := aEntity;
