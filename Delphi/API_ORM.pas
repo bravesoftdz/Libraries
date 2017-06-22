@@ -216,7 +216,6 @@ begin
       else
         ExtID := FData.Items[Relation.ForeignKey];
 
-
       if ExtID > 0 then
         FRelations.AddOrSetValue(
           Relation.EntityClass.GetTableName,
