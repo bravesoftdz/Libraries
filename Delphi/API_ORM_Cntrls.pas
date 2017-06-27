@@ -88,13 +88,17 @@ begin
     end
   else
     for Pair in FEntity.Relations do
-      if Pair.Value.Data.ContainsKey(FieldName) then
-        begin
-          if Sender is TEdit then
-            Pair.Value.Data.Items[FieldName] := (Sender as TEdit).Text;
-          if Sender is TColorBox then
-            Pair.Value.Data.Items[FieldName] := (Sender as TColorBox).Selected;
-        end;
+      begin
+        if Pair.Value = nil then Continue;
+
+        if Pair.Value.Data.ContainsKey(FieldName) then
+          begin
+            if Sender is TEdit then
+              Pair.Value.Data.Items[FieldName] := (Sender as TEdit).Text;
+            if Sender is TColorBox then
+              Pair.Value.Data.Items[FieldName] := (Sender as TColorBox).Selected;
+          end;
+      end;
 
   FAfterEditChange(Sender as TControl);
 end;

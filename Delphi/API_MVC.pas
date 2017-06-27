@@ -73,6 +73,7 @@ type
     constructor Create(aMainView: TViewAbstract); virtual;
     destructor Destroy; override;
     property ObjData: TObjectDictionary<string, TObject> read FObjData;
+    property Data: TDictionary<string, Variant> read FData;
   end;
 
   {$M-}
