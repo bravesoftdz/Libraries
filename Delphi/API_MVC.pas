@@ -82,7 +82,8 @@ implementation
 
 procedure TModelAbstract.CreateEvent(aEventMsg: string);
 begin
-  FOnEvent(aEventMsg);
+  if Assigned(FOnEvent) then
+    FOnEvent(aEventMsg);
 end;
 
 constructor TModelAbstract.Create(aData: TDictionary<string, variant>;
@@ -120,7 +121,7 @@ begin
           ModelProc;
       end;
   finally
-    FreeAndNil(Model);
+    //FreeAndNil(Model);
   end;
 end;
 
