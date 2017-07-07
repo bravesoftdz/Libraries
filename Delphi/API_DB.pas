@@ -9,6 +9,7 @@ uses
   FireDAC.Phys.Intf,
   FireDAC.Phys.MSAcc,
   FireDAC.Phys.MySQL,
+  FireDAC.Phys.SQLite,
   FireDAC.DApt,
   FireDAC.UI.Intf,
   FireDAC.Comp.UI,
