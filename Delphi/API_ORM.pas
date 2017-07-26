@@ -38,6 +38,8 @@ type
     function GetEntityRecordFromDB(aID: integer): TFDQuery;
     function CheckChanges(aFieldName: string; aCurrentRecord: TFDQuery): Boolean;
     function GetKeyValueString(aFields: TArray<string>): string;
+    function GetKeysString(aFields: TArray<string>): string;
+    function GetValuesString(aFields: TArray<string>): string;
     function GetFieldTypeByName(aFieldName: string): TFieldType;
     function GetExtIDByExtKey(aRelation: TRelation): Integer;
     procedure FillEntity(aID: integer);
@@ -453,6 +455,30 @@ begin
     end;
 end;
 
+function TEntityAbstract.GetKeysString(aFields: TArray<string>): string;
+var
+  i: integer;
+begin
+  Result := '';
+  for i := 0 to Length(aFields) - 1 do
+    begin
+      if i > 0 then Result := Result + ',';
+      Result := Result + aFields[i];
+    end;
+end;
+
+function TEntityAbstract.GetValuesString(aFields: TArray<string>): string;
+var
+  i: integer;
+begin
+  Result := '';
+  for i := 0 to Length(aFields) - 1 do
+    begin
+      if i > 0 then Result := Result + ',';
+      Result := Result + ':' + aFields[i];
+    end;
+end;
+
 function TEntityAbstract.GetKeyValueString(aFields: TArray<string>): string;
 var
   i: integer;
@@ -469,8 +495,8 @@ procedure TEntityAbstract.InsertToDB(aChangedFields: TArray<string>);
 var
   sql: string;
 begin
-  sql := 'insert into %s set %s';
-  sql := Format(sql, [GetTableName, GetKeyValueString(aChangedFields)]);
+  sql := 'insert into %s (%s) values (%s)';
+  sql := Format(sql, [GetTableName, GetKeysString(aChangedFields), GetValuesString(aChangedFields)]);
 
   StoreToDB(sql);
   FData['ID'] := FDBEngine.GetLastInsertedID;

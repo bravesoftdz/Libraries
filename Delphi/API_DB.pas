@@ -41,7 +41,7 @@ type
     procedure OpenQuery(aQuery: TFDQuery); overload;
     procedure OpenQuery(aQuery: TFDQuery; aSQL: string); overload;
 
-    procedure ExecQuery(aQuery: TFDQuery);
+    procedure ExecQuery(aQuery: TFDQuery); virtual;
 
     function GetLastInsertedID: integer; virtual; abstract;
     destructor Destroy; override;
