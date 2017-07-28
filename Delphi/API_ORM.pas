@@ -379,7 +379,7 @@ begin
       Result := Result + ',';
     end;
 
-  Result := Result + 'ID';
+  Result := Result + 't1.ID';
 end;
 
 procedure TEntityList<T>.FillEntityList(aFilters, aOrder: TArray<string>);

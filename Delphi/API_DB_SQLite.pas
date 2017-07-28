@@ -71,6 +71,16 @@ procedure TSQLiteEngine.SetConnectParams;
 begin
   inherited;
   FDConnection.Params.Values['DriverID'] := 'SQLite';
+
+  //FDConnection.Params.Add('Pooled=false');
+  //FDConnection.Params.Add('OpenMode=ReadWrite');
+  //FDConnection.Params.Add('DateTimeFormat=DateTime');
+  //FDConnection.Params.Add('StringFormat=Unicode');
+  //FDConnection.Params.Add('Protocol=Local');
+  //FDConnection.Params.Add('ForeignKeys=On');
+  //FDConnection.Params.Add('LockingMode=Normal');
+  //FDConnection.Params.Add('Synchronous=Full');
+  //FDConnection.Params.Add('SharedCache=False');
 end;
 
 end.
