@@ -134,7 +134,10 @@ begin
     dsQuery.ParamByName('FKValue').AsInteger := ID;
     FDBEngine.OpenQuery(dsQuery);
 
-    Result := dsQuery.FieldByName('Id').AsInteger;
+    if not dsQuery.IsEmpty then
+      Result := dsQuery.FieldByName('Id').AsInteger
+    else
+      Result := 0;
   finally
     dsQuery.Free;
   end;
