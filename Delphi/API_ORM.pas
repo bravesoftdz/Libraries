@@ -466,7 +466,7 @@ begin
   for i := 0 to Length(aFields) - 1 do
     begin
       if i > 0 then Result := Result + ',';
-      Result := Result + aFields[i];
+      Result := Result + Format('`%s`', [aFields[i]]);
     end;
 end;
 
