@@ -8,9 +8,20 @@ uses
   Vcl.StdCtrls,
   Vcl.Controls,
   Vcl.Forms,
-  API_ORM;
+  API_MVC,
+  API_ORM,
+  API_ORM_Bind;
 
   type
+  TViewORM = class(TViewAbstract)
+  protected
+    FBind: TBind;
+  public
+    constructor Create(AOwner: TComponent); override;
+    destructor Destroy; override;
+  end;
+
+
   TEditChangeEvent = procedure(aEdit: TControl) of object;
 
   TEntityPanelAbstract = class abstract(TScrollBox)
@@ -38,6 +49,18 @@ uses
   System.SysUtils,
   System.Generics.Collections,
   Data.DB;
+
+constructor TViewORM.Create(AOwner: TComponent);
+begin
+  inherited;
+  FBind := TBind.Create;
+end;
+
+destructor TViewORM.Destroy;
+begin
+  FBind.Free;
+  inherited;
+end;
 
 procedure TEntityPanelAbstract.CreateEntityFields;
 var
