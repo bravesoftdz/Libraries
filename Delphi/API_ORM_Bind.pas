@@ -18,9 +18,20 @@ type
   public
     procedure AddBind(aControl: TObject; aEntity: TEntityAbstract);
     function GetEntityByControl(aControl: TObject): TEntityAbstract;
+    function GetControlByEntity(aEntity: TEntityAbstract): TObject;
   end;
 
 implementation
+
+function TBind.GetControlByEntity(aEntity: TEntityAbstract): TObject;
+var
+  BindItem: TBindItem;
+begin
+  Result := nil;
+  for BindItem in FBindArray do
+    if BindItem.Entity = aEntity then
+      Exit(BindItem.Control);
+end;
 
 procedure TBind.AddBind(aControl: TObject; aEntity: TEntityAbstract);
 var
@@ -36,6 +47,7 @@ function TBind.GetEntityByControl(aControl: TObject): TEntityAbstract;
 var
   BindItem: TBindItem;
 begin
+  Result := nil;
   for BindItem in FBindArray do
     if BindItem.Control = aControl then
       Exit(BindItem.Entity);
