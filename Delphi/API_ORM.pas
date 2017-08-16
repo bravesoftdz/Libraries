@@ -93,6 +93,7 @@ type
     procedure SaveList(aKeyValue: integer);
     procedure DeleteByID(aID: integer);
     procedure DeleteByIndex(aIndex: integer);
+    procedure DeleteByEntity(aEntity: TEntityAbstract);
     procedure DeleteAll;
     constructor Create(aDBEngine: TDBEngine; aFilters, aOrder: TArray<string>); overload;
     constructor Create(aOwner: TEntityAbstract; aKeyField: string; aKeyValue: integer; aOrderKey: string = ''); overload;
@@ -270,6 +271,12 @@ begin
   finally
     dsQuery.Free;
   end;
+end;
+
+procedure TEntityList<T>.DeleteByEntity(aEntity: TEntityAbstract);
+begin
+  if Self.Remove(aEntity) >= 0 then
+    FDeletedIDs := FDeletedIDs + [aEntity.ID];
 end;
 
 procedure TEntityList<T>.DeleteByIndex(aIndex: integer);
@@ -625,7 +632,7 @@ begin
   FData := TDictionary<string, variant>.Create;
   FillEntity(aID);
 
-  FRelations := TObjectDictionary<string, TEntityAbstract>.Create;
+  FRelations := TObjectDictionary<string, TEntityAbstract>.Create([doOwnsValues]);
   RelateExternalEntities;
 end;
 
