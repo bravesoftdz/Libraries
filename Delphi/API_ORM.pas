@@ -274,9 +274,12 @@ begin
 end;
 
 procedure TEntityList<T>.DeleteByEntity(aEntity: TEntityAbstract);
+var
+  ID: Integer;
 begin
+  ID := aEntity.ID;
   if Self.Remove(aEntity) >= 0 then
-    FDeletedIDs := FDeletedIDs + [aEntity.ID];
+    FDeletedIDs := FDeletedIDs + [ID];
 end;
 
 procedure TEntityList<T>.DeleteByIndex(aIndex: integer);
