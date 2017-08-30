@@ -568,7 +568,7 @@ begin
     if Self.ID = 0 then
       InsertToDB(ChangedFields)
     else
-      if ChangesCount >0 then
+      if ChangesCount > 0 then
         UpdateToDB(ChangedFields);
 
   finally
