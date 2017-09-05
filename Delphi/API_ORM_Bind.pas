@@ -18,11 +18,29 @@ type
     FBindArray: TArray<TBindItem>;
   public
     procedure AddBind(aControl: TObject; aEntity: TEntityAbstract; aIndex: Integer = 0);
+    procedure RemoveBind(aControl: TObject; aIndex: Integer = 0);
     function GetEntityByControl(aControl: TObject; aIndex: Integer = 0): TEntityAbstract;
     function GetControlByEntity(aEntity: TEntityAbstract): TObject;
   end;
 
 implementation
+
+procedure TBind.RemoveBind(aControl: TObject; aIndex: Integer = 0);
+var
+  BindItem: TBindItem;
+  i: Integer;
+begin
+  i := -1;
+  for BindItem in FBindArray do
+    begin
+      Inc(i);
+
+      if    (BindItem.Control = aControl)
+        and (BindItem.Index = aIndex)
+      then
+        Delete(FBindArray, i, 1);
+    end;
+end;
 
 function TBind.GetControlByEntity(aEntity: TEntityAbstract): TObject;
 var
@@ -51,10 +69,12 @@ var
 begin
   Result := nil;
   for BindItem in FBindArray do
-    if    (BindItem.Control = aControl)
-      and (BindItem.Index = aIndex)
-    then
-      Exit(BindItem.Entity);
+    begin
+      if    (BindItem.Control = aControl)
+        and (BindItem.Index = aIndex)
+      then
+        Exit(BindItem.Entity);
+    end;
 end;
 
 end.

@@ -465,6 +465,12 @@ begin
       ftString: aParams[i].AsString := FData.Items[aParams[i].Name];
       ftInteger: aParams[i].AsInteger := FData.Items[aParams[i].Name];
       ftFloat: aParams[i].AsFloat := FData.Items[aParams[i].Name];
+      ftDateTime:
+        begin
+          aParams[i].AsDateTime := FData.Items[aParams[i].Name];
+          if aParams[i].AsDateTime = 0 then
+            aParams[i].Clear
+        end;
     end;
 end;
 
@@ -599,6 +605,8 @@ begin
         case DBField.FieldType of
           ftString: Value := dsQuery.FieldByName(DBField.FieldName).AsString;
           ftInteger: Value := dsQuery.FieldByName(DBField.FieldName).AsInteger;
+          ftFloat: Value := dsQuery.FieldByName(DBField.FieldName).AsFloat;
+          ftDateTime: Value := dsQuery.FieldByName(DBField.FieldName).AsDateTime;
         else
           Value := dsQuery.FieldByName(DBField.FieldName).AsString;
         end;
