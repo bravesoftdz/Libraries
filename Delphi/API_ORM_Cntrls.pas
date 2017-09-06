@@ -183,6 +183,8 @@ procedure TEntityPanelAbstract.BuildControls(aEntity: TEntityAbstract);
 var
   Pair: TPair<string, TEntityAbstract>;
 begin
+  if aEntity = nil then Exit;
+
   InitPanel;
   FFieldsCount := 0;
 
