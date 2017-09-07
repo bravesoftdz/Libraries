@@ -471,6 +471,7 @@ begin
           if aParams[i].AsDateTime = 0 then
             aParams[i].Clear
         end;
+      ftBoolean: aParams[i].AsBoolean := FData.Items[aParams[i].Name];
     end;
 end;
 
@@ -607,6 +608,7 @@ begin
           ftInteger: Value := dsQuery.FieldByName(DBField.FieldName).AsInteger;
           ftFloat: Value := dsQuery.FieldByName(DBField.FieldName).AsFloat;
           ftDateTime: Value := dsQuery.FieldByName(DBField.FieldName).AsDateTime;
+          ftBoolean: Value := dsQuery.FieldByName(DBField.FieldName).AsBoolean;
         else
           Value := dsQuery.FieldByName(DBField.FieldName).AsString;
         end;
