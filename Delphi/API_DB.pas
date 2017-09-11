@@ -38,7 +38,7 @@ type
     procedure OpenConnection(aConnectParams: TConnectParams); overload;
     procedure CloseConnection;
 
-    procedure OpenQuery(aQuery: TFDQuery); overload;
+    procedure OpenQuery(aQuery: TFDQuery; isFetchAll: Boolean = True); overload;
     procedure OpenQuery(aQuery: TFDQuery; aSQL: string); overload;
 
     procedure ExecQuery(aQuery: TFDQuery); virtual;
@@ -58,11 +58,11 @@ begin
   aQuery.ExecSQL;
 end;
 
-procedure TDBEngine.OpenQuery(aQuery: TFDQuery);
+procedure TDBEngine.OpenQuery(aQuery: TFDQuery; isFetchAll: Boolean = True);
 begin
   aQuery.Connection := FDConnection;
   aQuery.Open;
-  aQuery.FetchAll;
+  if isFetchAll then aQuery.FetchAll;
 end;
 
 procedure TDBEngine.OpenQuery(aQuery: TFDQuery; aSQL: string);
