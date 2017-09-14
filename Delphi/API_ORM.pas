@@ -20,16 +20,24 @@ type
   end;
 
   // One - To - One Relation
-  TRelation = record
-    ExtKey: string;
-    ForeignKey: string;
+  TOneRelation = record
+    ForeignKeyField: string;
+    ExternalKeyField: string;
     EntityClass: TEntityAbstractClass;
   end;
+
+  // One - To - Many Relation
+  {TManyRelation = record
+    RelName: string;
+    KeyField: string;
+    ExternalForeignKeyField: string;
+  end;}
 
   TEntityStruct = record
     TableName: string;
     FieldList: TArray<TDBField>;
-    RelatedList: TArray<TRelation>;
+    OneRelatedList: TArray<TOneRelation>;
+    function GetOneRelationByTableName(aTableName: string): TOneRelation;
   end;
 
   TEntityAbstract = class abstract
@@ -41,11 +49,11 @@ type
     function GetKeysString(aFields: TArray<string>): string;
     function GetValuesString(aFields: TArray<string>): string;
     function GetFieldTypeByName(aFieldName: string): TFieldType;
-    function GetExtIDByExtKey(aRelation: TRelation): Integer;
+    function GetExtIDByExtKey(aOneRelation: TOneRelation): Integer;
     procedure FillEntity(aID: integer);
     procedure RelateExternalEntities;
-    procedure SaveSlaveToMasterRelations;
-    procedure SaveMasterToSlaveRelations;
+    procedure SaveSlaveToMasterOneRelations;
+    procedure SaveMasterToSlaveOneRelations;
     procedure SetParams(aParams: TFDParams);
     procedure StoreToDB(aSQL: string);
     procedure InsertToDB(aChangedFields: TArray<string>);
@@ -54,24 +62,25 @@ type
   protected
     FDBEngine: TDBEngine;
     FFields: TArray<TDBField>;
-    FRelations: TObjectDictionary<string, TEntityAbstract>;
+    FOneRelations: TObjectDictionary<string, TEntityAbstract>;
     FData: TDictionary<string, variant>;
     procedure SaveLists; virtual;
   public
     procedure SaveEntity;
     procedure DeleteEntity;
+    procedure Assign(aSourceEntity: TEntityAbstract); virtual;
     procedure SaveAll;
     class function GetTableName: string;
     class function GetEntityStruct: TEntityStruct; virtual; abstract;
     class procedure AddField(var aFieldList: TArray<TDBField>; aFieldName: string; aFieldType: TFieldType);
-    class procedure AddRelation(var aRelatedList: TArray<TRelation>; aExtKey, aForeignKey: string;
+    class procedure AddOneRelation(var aOneRelatedList: TArray<TOneRelation>; aExternalKeyField, aForeignKeyField: string;
         aEntityClass: TEntityAbstractClass);
     constructor Create(aDBEngine: TDBEngine; aID: integer = 0);
     destructor Destroy; override;
     property ID: integer read GetID;
     property Fields: TArray<TDBField> read FFields;
     property Data: TDictionary<string, variant> read FData;
-    property Relations: TObjectDictionary<string, TEntityAbstract> read FRelations;
+    property OneRelations: TObjectDictionary<string, TEntityAbstract> read FOneRelations;
     property OnFree: TFreeEvent read FOnFree write FOnFree;
   end;
 
@@ -91,6 +100,7 @@ type
   public
     function FindByID(aID: integer): T;
     procedure SaveList(aKeyValue: integer);
+    procedure Assign(aEntityList: TEntityList<T>);
     procedure DeleteByID(aID: integer);
     procedure DeleteByIndex(aIndex: integer);
     procedure DeleteByEntity(aEntity: TEntityAbstract);
@@ -105,32 +115,89 @@ uses
   System.Classes,
   System.SysUtils;
 
-procedure TEntityAbstract.SaveMasterToSlaveRelations;
+procedure TEntityList<T>.Assign(aEntityList: TEntityList<T>);
+var
+  Entity, CloneEntity: TEntityAbstract;
+  EntityClass: TEntityAbstractClass;
+begin
+  EntityClass := T;
+
+  for Entity in aEntityList do
+    begin
+      CloneEntity := EntityClass.Create(FDBEngine);
+      CloneEntity.Assign(Entity);
+
+      Self.Add(CloneEntity);
+    end;
+end;
+
+function TEntityStruct.GetOneRelationByTableName(aTableName: string): TOneRelation;
+var
+  OneRelation: TOneRelation;
+begin
+  for OneRelation in OneRelatedList do
+    if OneRelation.EntityClass.GetTableName = aTableName then Exit(OneRelation);
+end;
+
+procedure TEntityAbstract.Assign(aSourceEntity: TEntityAbstract);
+var
+  Pair: TPair<string, variant>;
+  OneRelPair: TPair<string, TEntityAbstract>;
+  NewEntity: TEntityAbstract;
+  EntityClass: TEntityAbstractClass;
+begin
+  // Copy Fields
+  for Pair in aSourceEntity.Data do
+    begin
+      if Pair.Key = 'ID' then Continue;
+
+      FData.AddOrSetValue(Pair.Key, Pair.Value);
+    end;
+
+  // Copy One To One Relations
+  for OneRelPair in aSourceEntity.OneRelations do
+    begin
+      if OneRelPair.Value <> nil then
+        begin
+          EntityClass := GetEntityStruct.GetOneRelationByTableName(OneRelPair.Key).EntityClass;
+
+          NewEntity := EntityClass.Create(FDBEngine);
+          NewEntity.Assign(OneRelPair.Value);
+        end
+      else NewEntity := nil;
+
+      FOneRelations.AddOrSetValue(OneRelPair.Key, NewEntity);
+    end;
+
+  // Copy One To Many Relations implicts after inherited in assign method
+end;
+
+procedure TEntityAbstract.SaveMasterToSlaveOneRelations;
 var
   Pair: TPair<string, TEntityAbstract>;
-  Relation: TRelation;
+  OneRelation: TOneRelation;
 begin
-  for Pair in FRelations do
-    for Relation in GetEntityStruct.RelatedList do
+  for Pair in FOneRelations do
+    for OneRelation in GetEntityStruct.OneRelatedList do
       begin
-        if Relation.ForeignKey <> '' then Continue;
+        if OneRelation.ForeignKeyField <> '' then Continue;
 
-        if Pair.Value is Relation.EntityClass then
+        if Pair.Value is OneRelation.EntityClass then
           begin
-            Pair.Value.Data[Relation.ExtKey] := ID;
+            Pair.Value.Data[OneRelation.ExternalKeyField] := ID;
             Pair.Value.SaveAll;
           end;
       end;
 end;
 
-function TEntityAbstract.GetExtIDByExtKey(aRelation: TRelation): Integer;
+function TEntityAbstract.GetExtIDByExtKey(aOneRelation: TOneRelation): Integer;
 var
   dsQuery: TFDQuery;
 begin
   dsQuery := TFDQuery.Create(nil);
   try
     dsQuery.SQL.Text := Format('select Id from %s where %s = :FKValue',
-      [aRelation.EntityClass.GetTableName, aRelation.ExtKey]
+      [aOneRelation.EntityClass.GetTableName, aOneRelation.ExternalKeyField]
     );
     dsQuery.ParamByName('FKValue').AsInteger := ID;
     FDBEngine.OpenQuery(dsQuery);
@@ -154,19 +221,19 @@ begin
   Self.Clear;
 end;
 
-procedure TEntityAbstract.SaveSlaveToMasterRelations;
+procedure TEntityAbstract.SaveSlaveToMasterOneRelations;
 var
   Pair: TPair<string, TEntityAbstract>;
-  Relation: TRelation;
+  OneRelation: TOneRelation;
 begin
-  for Pair in FRelations do
-    for Relation in GetEntityStruct.RelatedList do
-      if Pair.Value is Relation.EntityClass then
+  for Pair in FOneRelations do
+    for OneRelation in GetEntityStruct.OneRelatedList do
+      if Pair.Value is OneRelation.EntityClass then
         begin
-          if Relation.ForeignKey = '' then Continue;
+          if OneRelation.ForeignKeyField = '' then Continue;
 
           Pair.Value.SaveAll;
-          FData.Items[Relation.ForeignKey] := Pair.Value.Data[Relation.ExtKey];
+          FData.Items[OneRelation.ForeignKeyField] := Pair.Value.Data[OneRelation.ExternalKeyField];
         end;
 end;
 
@@ -179,7 +246,7 @@ begin
     aEntity.Data[aKeyField] := aValue
   else
     begin
-      for Pair in aEntity.FRelations do
+      for Pair in aEntity.FOneRelations do
         begin
           if Pair.Value.Data.ContainsKey(aKeyField) then
             Pair.Value.Data[aKeyField] := aValue;
@@ -189,61 +256,61 @@ end;
 
 function TEntityList<T>.GetFromPart(aEntityStruct: TEntityStruct): string;
 var
-  Relation: TRelation;
+  OneRelation: TOneRelation;
   i: Integer;
   ForeignKey: string;
 begin
   Result := aEntityStruct.TableName + ' t1';
 
   i := 1;
-  for Relation in aEntityStruct.RelatedList do
+  for OneRelation in aEntityStruct.OneRelatedList do
     begin
       Inc(i);
-      if Relation.ForeignKey = '' then
+      if OneRelation.ForeignKeyField = '' then
         ForeignKey := 'id'
       else
-        ForeignKey := Relation.ForeignKey;
+        ForeignKey := OneRelation.ForeignKeyField;
 
       Result := Result + Format(' left join %s t%d on t%d.%s = t1.%s',
-        [Relation.EntityClass.GetTableName, i, i, Relation.ExtKey, ForeignKey]
+        [OneRelation.EntityClass.GetTableName, i, i, OneRelation.ExternalKeyField, ForeignKey]
       );
     end;
 end;
 
 procedure TEntityAbstract.RelateExternalEntities;
 var
-  Relation: TRelation;
+  OneRelation: TOneRelation;
   ExtID: Integer;
 begin
-  for Relation in GetEntityStruct.RelatedList do
+  for OneRelation in GetEntityStruct.OneRelatedList do
     begin
-      if Relation.ForeignKey = '' then
-        ExtID := GetExtIDByExtKey(Relation)
+      if OneRelation.ForeignKeyField = '' then
+        ExtID := GetExtIDByExtKey(OneRelation)
       else
-        ExtID := FData.Items[Relation.ForeignKey];
+        ExtID := FData.Items[OneRelation.ForeignKeyField];
 
       if ExtID > 0 then
-        FRelations.AddOrSetValue(
-          Relation.EntityClass.GetTableName,
-          Relation.EntityClass.Create(FDBEngine, ExtID)
+        FOneRelations.AddOrSetValue(
+          OneRelation.EntityClass.GetTableName,
+          OneRelation.EntityClass.Create(FDBEngine, ExtID)
         )
       else
-        FRelations.AddOrSetValue(
-          Relation.EntityClass.GetTableName,
+        FOneRelations.AddOrSetValue(
+          OneRelation.EntityClass.GetTableName,
           nil
         );
     end;
 end;
 
-class procedure TEntityAbstract.AddRelation(var aRelatedList: TArray<TRelation>; aExtKey, aForeignKey: string;
+class procedure TEntityAbstract.AddOneRelation(var aOneRelatedList: TArray<TOneRelation>; aExternalKeyField, aForeignKeyField: string;
     aEntityClass: TEntityAbstractClass);
 var
-  Relation: TRelation;
+  OneRelation: TOneRelation;
 begin
-  Relation.ExtKey := aExtKey;
-  Relation.ForeignKey := aForeignKey;
-  Relation.EntityClass := aEntityClass;
-  aRelatedList := aRelatedList + [Relation];
+  OneRelation.ExternalKeyField := aExternalKeyField;
+  OneRelation.ForeignKeyField := aForeignKeyField;
+  OneRelation.EntityClass := aEntityClass;
+  aOneRelatedList := aOneRelatedList + [OneRelation];
 end;
 
 class function TEntityAbstract.GetTableName: string;
@@ -343,9 +410,9 @@ end;
 
 procedure TEntityAbstract.SaveAll;
 begin
-  SaveSlaveToMasterRelations;
+  SaveSlaveToMasterOneRelations;
   SaveEntity;
-  SaveMasterToSlaveRelations;
+  SaveMasterToSlaveOneRelations;
   SaveLists;
 end;
 
@@ -586,7 +653,7 @@ end;
 destructor TEntityAbstract.Destroy;
 begin
   FData.Free;
-  FRelations.Free;
+  FOneRelations.Free;
   if Assigned(FOnFree) then FOnFree;
   inherited;
 end;
@@ -645,7 +712,7 @@ begin
   FData := TDictionary<string, variant>.Create;
   FillEntity(aID);
 
-  FRelations := TObjectDictionary<string, TEntityAbstract>.Create([doOwnsValues]);
+  FOneRelations := TObjectDictionary<string, TEntityAbstract>.Create([doOwnsValues]);
   RelateExternalEntities;
 end;
 

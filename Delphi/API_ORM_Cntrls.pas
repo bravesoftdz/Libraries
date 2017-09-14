@@ -94,7 +94,7 @@ begin
         FEntity.Data.Items[FieldName] := (Sender as TColorBox).Selected;
     end
   else
-    for Pair in FEntity.Relations do
+    for Pair in FEntity.OneRelations do
       begin
         if Pair.Value = nil then Continue;
 
@@ -191,7 +191,7 @@ begin
   FEntity := aEntity;
   CreateEntityFields;
 
-  for Pair in aEntity.Relations  do
+  for Pair in aEntity.OneRelations  do
     begin
       FEntity := Pair.Value;
       if Assigned(FEntity) then CreateEntityFields;
