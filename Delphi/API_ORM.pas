@@ -43,13 +43,13 @@ type
   TEntityAbstract = class abstract
   private
     FOnFree: TFreeEvent;
-    function GetEntityRecordFromDB(aID: integer): TFDQuery;
     function CheckChanges(aFieldName: string; aCurrentRecord: TFDQuery): Boolean;
     function GetKeyValueString(aFields: TArray<string>): string;
     function GetKeysString(aFields: TArray<string>): string;
     function GetValuesString(aFields: TArray<string>): string;
     function GetFieldTypeByName(aFieldName: string): TFieldType;
     function GetExtIDByExtKey(aOneRelation: TOneRelation): Integer;
+    procedure GetEntityRecordFromDB(aFDQuery: TFDQuery; aID: integer);
     procedure FillEntity(aID: integer);
     procedure RelateExternalEntities;
     procedure SaveSlaveToMasterOneRelations;
@@ -609,16 +609,14 @@ begin
     Result := True;
 end;
 
-function TEntityAbstract.GetEntityRecordFromDB(aID: Integer): TFDQuery;
+procedure TEntityAbstract.GetEntityRecordFromDB(aFDQuery: TFDQuery; aID: integer);
 var
   sql: string;
 begin
-  Result := TFDQuery.Create(nil);
-
   sql := 'select * from %s where Id = :ID';
-  Result.SQL.Text := Format(sql, [GetTableName]);
-  Result.ParamByName('ID').AsInteger := aID;
-  FDBEngine.OpenQuery(Result);
+  aFDQuery.SQL.Text := Format(sql, [GetTableName]);
+  aFDQuery.ParamByName('ID').AsInteger := aID;
+  FDBEngine.OpenQuery(aFDQuery);
 end;
 
 procedure TEntityAbstract.SaveEntity;
@@ -629,7 +627,7 @@ var
 begin
   dsQuery := TFDQuery.Create(nil);
   try
-    dsQuery := GetEntityRecordFromDB(Self.ID);
+    GetEntityRecordFromDB(dsQuery, Self.ID);
 
     ChangesCount := 0;
     for i := 0 to Length(FFields) - 1 do
@@ -666,7 +664,7 @@ var
 begin
   dsQuery := TFDQuery.Create(nil);
   try
-    dsQuery := GetEntityRecordFromDB(aID);
+    GetEntityRecordFromDB(dsQuery, aID);
 
     for DBField in FFields do
       begin

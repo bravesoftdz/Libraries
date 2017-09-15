@@ -81,7 +81,7 @@ begin
             i:=0;
           end;
 
-        if i>100 then
+        if i>4 then
           begin
             ShowMessage('Tranlsater error: (' + aLang + ') '+aText+', '+E.Message);
             Abort;
