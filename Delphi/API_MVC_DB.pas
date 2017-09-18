@@ -26,7 +26,7 @@ type
     FDBEngineClass: TDBEngineClass;
     FConnectOnCreate: Boolean;
     procedure InitDB; virtual; abstract;
-    procedure CallModel(aModelClass: TModelClass; aProcName: string = ''); override;
+    procedure CallModel(aModelClass: TModelClass; aProcName: string = ''; aIsAsync: Boolean = False); override;
     function GetConnectParams(aFileName: String): TConnectParams;
   public
     constructor Create(aMainView: TViewAbstract); override;
@@ -46,7 +46,7 @@ begin
   FDBEngine := FObjData.Items['DBEngine'] as TDBEngine;
 end;
 
-procedure TControllerDB.CallModel(aModelClass: TModelClass; aProcName: string = '');
+procedure TControllerDB.CallModel(aModelClass: TModelClass; aProcName: string = ''; aIsAsync: Boolean = False);
 begin
   FObjData.AddOrSetValue('DBEngine', FDBEngine);
   inherited;

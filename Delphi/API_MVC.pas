@@ -64,7 +64,8 @@ type
     procedure PerfomViewMessage(aMsg: string); virtual; abstract;
     procedure EventListener(aEventMsg: string); virtual; abstract;
     procedure CallView(aViewAbstractClass: TViewAbstractClass; aIsModal: Boolean = false);
-    procedure CallModel(aModelClass: TModelClass; aProcName: string = ''); virtual;
+    procedure CallModel(aModelClass: TModelClass; aProcName: string = ''; aIsAsync: Boolean = False); virtual;
+    procedure CallAsyncModel(aModelClass: TModelClass; aProcName: string = '');
   public
     procedure ReceiveViewMessage(aMsg: string);
     constructor Create(aMainView: TViewAbstract); virtual;
@@ -74,6 +75,11 @@ type
   {$M-}
 
 implementation
+
+procedure TControllerAbstract.CallAsyncModel(aModelClass: TModelClass; aProcName: string = '');
+begin
+  CallModel(aModelClass, aProcName, True);
+end;
 
 procedure TModelAbstract.CreateEvent(aEventMsg: string);
 begin
@@ -96,7 +102,7 @@ begin
   inherited;
 end;
 
-procedure TControllerAbstract.CallModel(aModelClass: TModelClass; aProcName: string = '');
+procedure TControllerAbstract.CallModel(aModelClass: TModelClass; aProcName: string = ''; aIsAsync: Boolean = False);
 var
   Model: TModelAbstract;
   ModelProc: TProc;
@@ -116,7 +122,7 @@ begin
           ModelProc;
       end;
   finally
-    //FreeAndNil(Model);
+    if not aIsAsync then FreeAndNil(Model);
   end;
 end;
 

@@ -12,7 +12,7 @@ uses
 type
   TEntityAbstract = class;
   TEntityAbstractClass = class of TEntityAbstract;
-  TFreeEvent = procedure of object;
+  TListFreeMethod = procedure of object;
 
   TDBField = record
     FieldName: string;
@@ -42,7 +42,7 @@ type
 
   TEntityAbstract = class abstract
   private
-    FOnFree: TFreeEvent;
+    FListFreeProcs: TArray<TMethod>;
     function CheckChanges(aFieldName: string; aCurrentRecord: TFDQuery): Boolean;
     function GetKeyValueString(aFields: TArray<string>): string;
     function GetKeysString(aFields: TArray<string>): string;
@@ -81,7 +81,7 @@ type
     property Fields: TArray<TDBField> read FFields;
     property Data: TDictionary<string, variant> read FData;
     property OneRelations: TObjectDictionary<string, TEntityAbstract> read FOneRelations;
-    property OnFree: TFreeEvent read FOnFree write FOnFree;
+    property ListFreeProcs: TArray<TMethod> read FListFreeProcs write FListFreeProcs;
   end;
 
   // One - To - Many Relation
@@ -95,8 +95,8 @@ type
     function GetWherePart(aFilters: TArray<string>): string;
     function GetOrderPart(aOrder: TArray<string>): string;
     procedure FillEntityList(aFilters, aOrder: TArray<string>);
-    procedure FreeList;
     procedure UpdateKeys(aEntity: TEntityAbstract; aKeyField: string; aValue: integer);
+    procedure FreeList;
   public
     function FindByID(aID: integer): T;
     procedure SaveList(aKeyValue: integer);
@@ -420,6 +420,7 @@ constructor TEntityList<T>.Create(aOwner: TEntityAbstract; aKeyField: string; aK
 var
   Filters: TArray<string>;
   Order: TArray<string>;
+  Method: TMethod;
 begin
   Filters := [Format('%s=%d', [aKeyField, aKeyValue])];
 
@@ -430,7 +431,11 @@ begin
 
   inherited Create(True);
   FDBEngine := aOwner.FDBEngine;
-  aOwner.OnFree := FreeList;
+
+  Method.Code := @TEntityList<T>.FreeList;
+  Method.Data := Self;
+  aOwner.ListFreeProcs := aOwner.ListFreeProcs + [Method];
+
   FKeyField := aKeyField;
   FKeyValue := aKeyValue;
   FillEntityList(Filters, Order);
@@ -649,10 +654,20 @@ begin
 end;
 
 destructor TEntityAbstract.Destroy;
+var
+  Method: TMethod;
+  ListFreeMethod: TListFreeMethod;
 begin
   FData.Free;
   FOneRelations.Free;
-  if Assigned(FOnFree) then FOnFree;
+
+  // Free Lists
+  for Method in FListFreeProcs do
+    begin
+      ListFreeMethod := TListFreeMethod(Method);
+      ListFreeMethod;
+    end;
+
   inherited;
 end;
 
