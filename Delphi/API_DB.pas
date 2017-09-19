@@ -107,6 +107,7 @@ begin
   FIsConnected := True;
 
   FDConnection.LoginPrompt := False;
+  FDConnection.ResourceOptions.SilentMode := True;
   FDConnection.Connected := True;
 end;
 
