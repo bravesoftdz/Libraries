@@ -145,7 +145,7 @@ begin
   lblFieldTitle.Caption := aDBField.FieldName;
 
   case aDBField.FieldType of
-    ftInteger, ftString:
+    ftInteger, ftString, ftBoolean:
       begin
         if aDBField.FieldName.Contains('COLOR') then
           begin
