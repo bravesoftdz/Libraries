@@ -205,6 +205,9 @@ begin
   inherited Create(aOwner);
   Self.Parent := aOwner;
   Self.Align := alClient;
+  Self.BevelOuter := bvNone;
+  Self.BorderStyle := bsNone;
+  Self.ParentBackground := True;
 end;
 
 end.
