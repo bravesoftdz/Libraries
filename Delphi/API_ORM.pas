@@ -43,6 +43,7 @@ type
   TEntityAbstract = class abstract
   private
     FListFreeProcs: TArray<TMethod>;
+    FOneRelDeletedKeys: TArray<String>;
     function CheckChanges(aFieldName: string; aCurrentRecord: TFDQuery): Boolean;
     function GetKeyValueString(aFields: TArray<string>): string;
     function GetKeysString(aFields: TArray<string>): string;
@@ -68,6 +69,7 @@ type
   public
     procedure SaveEntity;
     procedure DeleteEntity;
+    procedure DeleteOneRelation(aEntity: TEntityAbstract);
     procedure Assign(aSourceEntity: TEntityAbstract); virtual;
     procedure SaveAll;
     class function GetTableName: string;
@@ -114,6 +116,26 @@ implementation
 uses
   System.Classes,
   System.SysUtils;
+
+procedure TEntityAbstract.DeleteOneRelation(aEntity: TEntityAbstract);
+var
+  RelEntity: TEntityAbstract;
+  TableName: string;
+begin
+  if aEntity <> nil then
+    begin
+      if FOneRelations.TryGetValue(aEntity.GetTableName, RelEntity) then
+        if aEntity = RelEntity then
+          begin
+            TableName := aEntity.GetTableName;
+
+            FOneRelations.ExtractPair(TableName);
+            FreeAndNil(aEntity);
+            FOneRelations.AddOrSetValue(TableName, nil);
+            FOneRelDeletedKeys := FOneRelDeletedKeys + [TableName];
+          end;
+    end;
+end;
 
 procedure TEntityList<T>.Assign(aEntityList: TEntityList<T>);
 var
@@ -176,7 +198,25 @@ procedure TEntityAbstract.SaveMasterToSlaveOneRelations;
 var
   Pair: TPair<string, TEntityAbstract>;
   OneRelation: TOneRelation;
+  DeletedKey: string;
+  DeletedOneRelEntity: TEntityAbstract;
+  DeletedEntID: Integer;
 begin
+  for DeletedKey in FOneRelDeletedKeys do
+    begin
+      for OneRelation in GetEntityStruct.OneRelatedList do
+        if OneRelation.EntityClass.GetTableName = DeletedKey then
+          begin
+            DeletedEntID := GetExtIDByExtKey(OneRelation);
+            DeletedOneRelEntity := OneRelation.EntityClass.Create(FDBEngine, DeletedEntID);
+            try
+              DeletedOneRelEntity.DeleteEntity;
+            finally
+              FreeAndNil(DeletedOneRelEntity);
+            end;
+          end;
+    end;
+
   for Pair in FOneRelations do
     for OneRelation in GetEntityStruct.OneRelatedList do
       begin
