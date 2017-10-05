@@ -571,19 +571,37 @@ end;
 procedure TEntityAbstract.SetParams(aParams: TFDParams);
 var
   i: Integer;
+  FieldType: TFieldType;
 begin
   for i := 0 to aParams.Count - 1 do
-    case GetFieldTypeByName(aParams[i].Name) of
-      ftString: aParams[i].AsString := FData.Items[aParams[i].Name];
-      ftInteger: aParams[i].AsInteger := FData.Items[aParams[i].Name];
-      ftFloat: aParams[i].AsFloat := FData.Items[aParams[i].Name];
-      ftDateTime:
-        begin
-          aParams[i].AsDateTime := FData.Items[aParams[i].Name];
-          if aParams[i].AsDateTime = 0 then
-            aParams[i].Clear
-        end;
-      ftBoolean: aParams[i].AsBoolean := FData.Items[aParams[i].Name];
+    begin
+      FieldType := GetFieldTypeByName(aParams[i].Name);
+      aParams[i].DataType := FieldType;
+
+      case FieldType of
+        ftString: aParams[i].AsString := FData.Items[aParams[i].Name];
+
+        ftInteger:
+          begin
+            if    aParams[i].Name.Contains('_ID')
+              and (FData.Items[aParams[i].Name] = 0)
+            then
+              aParams[i].Clear
+            else
+              aParams[i].AsInteger := FData.Items[aParams[i].Name];
+          end;
+
+        ftFloat: aParams[i].AsFloat := FData.Items[aParams[i].Name];
+
+        ftDateTime:
+          begin
+            aParams[i].AsDateTime := FData.Items[aParams[i].Name];
+            if aParams[i].AsDateTime = 0 then
+              aParams[i].Clear
+          end;
+
+        ftBoolean: aParams[i].AsBoolean := FData.Items[aParams[i].Name];
+      end;
     end;
 end;
 
