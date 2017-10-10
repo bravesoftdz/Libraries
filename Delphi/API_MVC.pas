@@ -27,14 +27,14 @@ type
     FData: TDictionary<string, variant>;
     FObjData: TObjectDictionary<string, TObject>;
     FOnEvent: TEventListener;
-    FProc: TProc;
+    //FProc: TProc;
     procedure CreateEvent(aEventMsg: string);
   public
     procedure Execute; virtual; abstract;
     constructor Create(aData: TDictionary<string, variant>;
       aObjData: TObjectDictionary<string, TObject>); virtual;
     property OnEvent: TEventListener read FOnEvent write FOnEvent;
-    property Proc: TProc read FProc write FProc;
+    //property Proc: TProc read FProc write FProc;
   end;
 
   // View
