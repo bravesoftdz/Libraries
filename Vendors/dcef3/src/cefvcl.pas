@@ -873,16 +873,25 @@ end;
 
 
 destructor TCustomChromium.Destroy;
+var
+  ff: TVCLClientHandler;
+  i: Integer;
 begin
   if FBrowser <> nil then
     FBrowser.StopLoad;
 
   if FHandler <> nil then
-    (FHandler as ICefClientHandler).Disconnect;
+    begin
+      (FHandler as ICefClientHandler).Disconnect;
+      ff := (FHandler as TVCLClientHandler);
+      for i := 1 to ff.FRefCount do
+        ff._Release;
+    end;
   FHandler := nil;
   FBrowser := nil;
   FFontOptions.Free;
   FOptions.Free;
+
   inherited;
 end;
 
