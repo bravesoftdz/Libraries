@@ -38,6 +38,9 @@ type
   end;
 
   // View
+  /// <summary>
+  /// Base View Class in MVC pattern.
+  /// </summary>
   TViewAbstract = class abstract(TForm)
   private
     FIsMainForm: Boolean;
