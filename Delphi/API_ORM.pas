@@ -12,6 +12,7 @@ uses
 type
   TEntityAbstract = class;
   TEntityAbstractClass = class of TEntityAbstract;
+
   TListFreeMethod = procedure of object;
 
   TDBField = record
@@ -67,6 +68,9 @@ type
     FData: TDictionary<string, variant>;
     procedure SaveLists; virtual;
   public
+    ////////////////////////////////////////////////////////////////////////////
+
+    ////////////////////////////////////////////////////////////////////////////
     procedure SaveEntity;
     procedure DeleteEntity;
     procedure DeleteOneRelation(aEntity: TEntityAbstract);
@@ -429,13 +433,6 @@ var
 begin
   if aKeyValue = 0 then aKeyValue := FKeyValue;
 
-  for Entity in Self do
-    begin
-      UpdateKeys(Entity, FKeyField, aKeyValue);
-
-      Entity.SaveAll;
-    end;
-
   EntityClass := T;
   for DeletedID in FDeletedIDs do
     begin
@@ -445,6 +442,13 @@ begin
       finally
         DeleteEntity.Free;
       end;
+    end;
+
+  for Entity in Self do
+    begin
+      UpdateKeys(Entity, FKeyField, aKeyValue);
+
+      Entity.SaveAll;
     end;
 end;
 
