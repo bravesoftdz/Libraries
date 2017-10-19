@@ -34,8 +34,8 @@ var
   EditFile: TextFile;
 begin
   //try
-    //AssignFile(EditFile, aFileName, CP_UTF8);
-    AssignFile(EditFile, aFileName);
+    AssignFile(EditFile, aFileName, CP_UTF8);
+    //AssignFile(EditFile, aFileName);
     Append(EditFile);
     WriteLn(EditFile, aText);
     CloseFile(EditFile);
