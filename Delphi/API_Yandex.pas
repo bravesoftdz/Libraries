@@ -50,6 +50,8 @@ var
   isContiniue: Boolean;
   i: integer;
 begin
+  if aText.IsEmpty then Exit('');
+
   url:='https://translate.yandex.net/api/v1.5/tr.json/translate';
   isContiniue:=True;
   i:=0;
