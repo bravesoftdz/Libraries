@@ -1,4 +1,4 @@
-unit API_ORM_Cntrls;
+unit API_ORM_GUI;
 
 interface
 
@@ -13,14 +13,28 @@ uses
   API_ORM_Bind;
 
   type
+  /// <summary>
+  /// View(Form) Class in the MVC pattern with ORM bind support
+  /// </summary>
   TViewORM = class(TViewAbstract)
+  private
+    FRememberPosition: Boolean;
+    procedure RestorePosition;
+    procedure SavePosition;
   protected
     FBind: TBind;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
+    /// <summary>
+    /// Set True if need to remember current form size and restore it at next time form open.
+    /// Generally initialize inside TViewAbstract.InitView procedure.
+    /// </summary>
+    /// <remarks> See also
+    /// <see cref="API_MVC|TViewAbstract.InitView"/>
+    /// </remarks>
+    property RememberPosition: Boolean read FRememberPosition write FRememberPosition;
   end;
-
 
   TEditChangeEvent = procedure(aEdit: TControl) of object;
 
@@ -46,18 +60,54 @@ uses
 implementation
 
 uses
-  System.SysUtils,
+  API_Files,
+  Data.DB,
   System.Generics.Collections,
-  Data.DB;
+  System.SysUtils;
+
+procedure TViewORM.SavePosition;
+var
+  PosStrings: TStringList;
+  Path, FilePath: string;
+begin
+  TFilesEngine.CreateDirIfNotExists('ini');
+
+  PosStrings := TStringList.Create;
+  try
+    PosStrings.Values['Top'] := Self.Top.ToString;
+    PosStrings.Values['Left'] := Self.Left.ToString;
+
+    Path := GetCurrentDir + '\ini\';
+    FilePath := Path + Self.Name + '.ini';
+
+    PosStrings.SaveToFile(FilePath);
+  finally
+    PosStrings.Free;
+  end;
+end;
+
+procedure TViewORM.RestorePosition;
+begin
+  TFilesEngine.CreateDirIfNotExists('ini');
+
+  //Self.Name;
+end;
 
 constructor TViewORM.Create(AOwner: TComponent);
 begin
   inherited;
+
+  if RememberPosition then
+    RestorePosition;
+
   FBind := TBind.Create;
 end;
 
 destructor TViewORM.Destroy;
 begin
+  if RememberPosition then
+    SavePosition;
+
   FBind.Free;
   inherited;
 end;

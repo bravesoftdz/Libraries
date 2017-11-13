@@ -9,6 +9,8 @@ type
     class function GetTextFromFile(aFileName: String): String;
     class procedure SaveTextToFile(aFileName, aText: String);
     class procedure AppendToFile(aFileName, aText: String);
+
+    class procedure CreateDirIfNotExists(aDir: string);
   end;
 
 implementation
@@ -16,6 +18,12 @@ implementation
 uses
   System.Classes,
   System.SysUtils;
+
+class procedure TFilesEngine.CreateDirIfNotExists(aDir: string);
+begin
+  if not DirectoryExists(aDir) then
+    MkDir(aDir);
+end;
 
 class procedure TFilesEngine.CreateFile(aFileName: string);
 var
