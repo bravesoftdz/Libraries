@@ -68,7 +68,7 @@ uses
 procedure TViewORM.SavePosition;
 var
   PosStrings: TStringList;
-  Path, FilePath: string;
+  FilePath: string;
 begin
   TFilesEngine.CreateDirIfNotExists('ini');
 
@@ -76,10 +76,10 @@ begin
   try
     PosStrings.Values['Top'] := Self.Top.ToString;
     PosStrings.Values['Left'] := Self.Left.ToString;
+    PosStrings.Values['Height'] := Self.Height.ToString;
+    PosStrings.Values['Width'] := Self.Width.ToString;
 
-    Path := GetCurrentDir + '\ini\';
-    FilePath := Path + Self.Name + '.ini';
-
+    FilePath := GetCurrentDir + '\ini\' + Self.Name + '.ini';
     PosStrings.SaveToFile(FilePath);
   finally
     PosStrings.Free;
@@ -87,10 +87,30 @@ begin
 end;
 
 procedure TViewORM.RestorePosition;
+var
+  PosStrings: TStringList;
+  FilePath: string;
 begin
   TFilesEngine.CreateDirIfNotExists('ini');
 
-  //Self.Name;
+  PosStrings := TStringList.Create;
+  try
+    FilePath := GetCurrentDir + '\ini\' + Self.Name + '.ini';
+
+    if not FileExists(FilePath) then
+      Self.Position := poMainFormCenter
+    else
+      begin
+        PosStrings.LoadFromFile(FilePath);
+
+        Self.Top := PosStrings.Values['Top'].ToInteger;
+        Self.Left := PosStrings.Values['Left'].ToInteger;
+        Self.Height := PosStrings.Values['Height'].ToInteger;
+        Self.Width := PosStrings.Values['Width'].ToInteger;
+      end;
+  finally
+    PosStrings.Free;
+  end;
 end;
 
 constructor TViewORM.Create(AOwner: TComponent);
