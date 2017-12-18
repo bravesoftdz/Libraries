@@ -62,7 +62,7 @@ type
   TControllerAbstract = class abstract
   protected
     FData: TDictionary<string, variant>;
-    FObjData: TObjectDictionary<string, TObject>;
+    {FObjData: TObjectDictionary<string, TObject>;}
     FMainView: TViewAbstract;
     procedure PerfomViewMessage(aMsg: string); virtual; abstract;
     procedure EventListener(aEventMsg: string); virtual; abstract;
@@ -100,7 +100,7 @@ end;
 destructor TControllerAbstract.Destroy;
 begin
   FData.Free;
-  FObjData.Free;
+  {FObjData.Free;}
 
   inherited;
 end;
@@ -132,7 +132,7 @@ end;
 procedure TViewAbstract.FreeAfterClose(Sender: TObject; var Action: TCloseAction);
 begin
   Release;
-  SendMessage(Self.Name + 'Closed');
+  {SendMessage(Self.Name + 'Closed');}
 end;
 
 procedure TControllerAbstract.CallView(aViewAbstractClass: TViewAbstractClass; aIsModal: Boolean = false);
@@ -169,7 +169,7 @@ constructor TControllerAbstract.Create(aMainView: TViewAbstract);
 begin
   FMainView := aMainView;
   FData := TDictionary<string, variant>.Create;
-  FObjData := TObjectDictionary<string, TObject>.Create;
+  {FObjData := TObjectDictionary<string, TObject>.Create;}
 end;
 
 constructor TViewAbstract.Create(AOwner: TComponent);
