@@ -30,6 +30,9 @@ object ViewParse: TViewParse
       82
       82
       310)
+    RowHeights = (
+      18
+      18)
   end
   object btnStop: TButton
     Left = 136

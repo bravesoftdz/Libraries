@@ -45,11 +45,11 @@ type
   TParseTool = class
   public
     class function MultiParseByKey(aPage:string; aFirstKey:string; aLastKey:string): TArray<string>;
-    class function ParseByKey(aPage:string; aFirstKey:string; aLastKey:string; aFirstKeyCount:integer = 0): string;
+    {class function ParseByKey(aPage:string; aFirstKey:string; aLastKey:string; aFirstKeyCount:integer = 0): string;}
     class function ParseByKeyReverse(aPage: string; aFirstKey: string; aLastKey: string; aFirstKeyCount: Integer): string;
     class function Explode(aIncome: string; aDelimiter: string): TArray<string>;
     class function Inplode(aIncome: TArray<string>; aDelimiter: string; aFirstIndex: integer=0; aLastIndex: integer=0): string;
-    class function RemoveTags(aIncome: string): string;
+    {class function RemoveTags(aIncome: string): string;}
     class function CutBetween(aIncome, aFirstKey, aLastKey: string): string;
     class function TranslitRus2Lat(const Str: string): string;
   end;
@@ -460,7 +460,7 @@ begin
   FHTTP.IOHandler:=FIdSSLIOHandlerSocketOpenSSL;
 end;
 
-class function TParseTool.RemoveTags(aIncome: string): string;
+{function TParseTool.RemoveTags(aIncome: string): string;
 var
 tx, tag:string;
 i,t: integer;
@@ -481,7 +481,7 @@ begin
     end;
   while Pos(#$A+#$A, tx)>0 do tx:=StringReplace(tx,#$A+#$A,#$A,[rfReplaceAll, rfIgnoreCase]);
   Result:=tx;
-end;
+end;}
 
 function TParser.GetHTMLByURL(aURL: string; aPostData: TStringList = nil): string;
 var
@@ -876,7 +876,7 @@ begin
   end;
 end;
 
-class function TParseTool.ParseByKey(aPage:string; aFirstKey:string; aLastKey:string; aFirstKeyCount:integer = 0): string;
+{class function TParseTool.ParseByKey(aPage:string; aFirstKey:string; aLastKey:string; aFirstKeyCount:integer = 0): string;
 var
   tx:string;
   i:integer;
@@ -898,7 +898,7 @@ begin
       tx:=Trim(tx);
     end;
   Result:=tx;
-end;
+end;}
 
 class function TParseTool.MultiParseByKey(aPage: string; aFirstKey: string; aLastKey: string): TArray<string>;
 var
